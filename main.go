@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/76creates/stickers"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -89,6 +90,18 @@ func CreateModel() (*model, error) {
 	vp := viewport.New(defaultWidth, defaultHeight)
 	vp.Style = lipgloss.NewStyle().Width(defaultWidth).Height(defaultHeight).Background(lipgloss.Color("241"))
 
+	flexBox := stickers.NewFlexBox(0, 0)
+
+	row := stickers.FlexBoxRow{}
+
+	row.AddCells([]*stickers.FlexBoxCell{
+		stickers.NewFlexBoxCell(1, 1).SetStyle(lipgloss.NewStyle().Background(lipgloss.Color("#fc5c65"))),
+		stickers.NewFlexBoxCell(1, 1).SetStyle(lipgloss.NewStyle().Background(lipgloss.Color("#fd9644"))),
+		stickers.NewFlexBoxCell(1, 1).SetStyle(lipgloss.NewStyle().Background(lipgloss.Color("#fed330"))),
+	})
+
+	flexBox.AddRows([]*stickers.FlexBoxRow{&row})
+
 	// vp.Style = lipgloss.NewStyle().
 	// 	Align(lipgloss.Center).
 	// 	BorderStyle(lipgloss.RoundedBorder()).
@@ -117,11 +130,13 @@ func CreateModel() (*model, error) {
 
 	return &model{
 		viewport: vp,
+		flexbox:  flexBox,
 	}, nil
 }
 
 type model struct {
 	viewport viewport.Model
+	flexbox  *stickers.FlexBox
 }
 
 func (m model) Init() tea.Cmd {
@@ -134,6 +149,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Height = msg.Height - 2
 		m.viewport.Width = msg.Width
 		m.viewport.Style = m.viewport.Style.Width(msg.Width).Height(msg.Height)
+		m.flexbox.SetWidth(msg.Width)
+		m.flexbox.SetHeight(msg.Height)
+
+		row, exists := m.flexbox.GetRow(0)
+		if exists {
+			row.Cell(1).SetContent("Width: " + fmt.Sprint(msg.Width))
+		}
+
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -150,7 +173,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.viewport.View() + helpView()
+	// return m.viewport.View() + helpView()
+	return m.flexbox.Render()
 }
 
 func helpView() string {
