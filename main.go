@@ -72,17 +72,8 @@ func main() {
 }
 
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-	// use Fileread
-	// content, err := os.ReadFile("fs/root.md")
-
-	// if err != nil {
-	// 	fmt.Println("Error reading file:", err)
-	// 	return model{}, nil
-	// }
-
-	// fmt.Println("Content:", string(content))
-
-	m, err := NewModel()
+	// build a new model
+	m, err := CreateModel()
 
 	if err != nil {
 		fmt.Println("Could not initialize Bubble Tea model:", err)
@@ -92,7 +83,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	return m, []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
 }
 
-func NewModel() (*model, error) {
+func CreateModel() (*model, error) {
 	const width = 78
 
 	vp := viewport.New(width, 20)
