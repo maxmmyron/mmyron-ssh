@@ -12,7 +12,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
@@ -84,33 +83,37 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 }
 
 func CreateModel() (*model, error) {
-	const width = 78
+	const defaultWidth = 78
+	const defaultHeight = 20
 
-	vp := viewport.New(width, 20)
-	vp.Style = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
-		PaddingRight(2)
+	vp := viewport.New(defaultWidth, defaultHeight)
+	vp.Style = lipgloss.NewStyle().Width(defaultWidth).Height(defaultHeight).Background(lipgloss.Color("241"))
 
-	renderer, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(width),
-	)
-	if err != nil {
-		return nil, err
-	}
+	// vp.Style = lipgloss.NewStyle().
+	// 	Align(lipgloss.Center).
+	// 	BorderStyle(lipgloss.RoundedBorder()).
+	// 	BorderForeground(lipgloss.Color("62")).
+	// 	PaddingRight(2)
 
-	content, err := os.ReadFile("fs/root.md")
-	if err != nil {
-		return nil, err
-	}
+	// renderer, err := glamour.NewTermRenderer(
+	// 	glamour.WithAutoStyle(),
+	// 	glamour.WithWordWrap(defaultWidth),
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	str, err := renderer.Render(string(content))
-	if err != nil {
-		return nil, err
-	}
+	// content, err := os.ReadFile("fs/root.md")
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	vp.SetContent(str)
+	// str, err := renderer.Render(string(content))
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// vp.SetContent(str)
 
 	return &model{
 		viewport: vp,
@@ -127,6 +130,11 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.viewport.Height = msg.Height - 2
+		m.viewport.Width = msg.Width
+		m.viewport.Style = m.viewport.Style.Width(msg.Width).Height(msg.Height)
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
