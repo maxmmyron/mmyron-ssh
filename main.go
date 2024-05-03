@@ -31,12 +31,22 @@ const (
 )
 
 var (
+	linkBorder = lipgloss.Border{
+		Top:         "─",
+		Bottom:      "─",
+		Left:        "│",
+		Right:       "│",
+		TopLeft:     "╭",
+		TopRight:    "╮",
+		BottomLeft:  "╰",
+		BottomRight: "╯",
+	}
+
 	subtle = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
 	// highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	special   = lipgloss.AdaptiveColor{Light: "#DB22CE", Dark: "#DB46CF"}
-	helpStyle = lipgloss.NewStyle().Foreground(subtle).BorderTop(true).BorderTopForeground(subtle).Render
-	selected  = -1
-	paths     = []string{
+	special  = lipgloss.AdaptiveColor{Light: "#DB22CE", Dark: "#DB46CF"}
+	selected = -1
+	paths    = []string{
 		"fs/root.md",
 		"fs/posts/1.md",
 		"fs/posts/2.md",
@@ -126,10 +136,12 @@ func (m model) Init() tea.Cmd {
 }
 
 func RebuildGlamourViewport(m model) (model, error) {
+	width := min(m.viewport.Width, 78)
+
 	// render content to dynamic size
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithStandardStyle("dracula"),
-		glamour.WithWordWrap(min(m.viewport.Width, 78)),
+		glamour.WithWordWrap(width),
 	)
 
 	if err != nil {
@@ -147,12 +159,20 @@ func RebuildGlamourViewport(m model) (model, error) {
 		// render paths
 		pathsStr := ""
 
+		// from 1 - len(paths)
 		for i, p := range paths {
-			if i == selected {
-				pathsStr += lipgloss.NewStyle().Foreground(special).Render(fmt.Sprintf(" %s ", p))
-			} else {
-				pathsStr += fmt.Sprintf(" %s ", p)
+			if p == m.path {
+				continue
 			}
+
+			if i == selected {
+				link := lipgloss.Place(width, 3, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render("> "+p))
+				pathsStr += "\n" + link
+			} else {
+				link := lipgloss.Place(width, 3, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(subtle).Render("  "+p))
+				pathsStr += "\n" + link
+			}
+
 		}
 
 		str += pathsStr
@@ -196,6 +216,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			selected = (selected + 1) % len(paths)
 		case "shift+tab":
+			// FIXME: this is not working
 			if m.path == "fs/root.md" {
 				return m, nil
 			}
@@ -246,7 +267,11 @@ func pathView(m model) string {
 
 func helpView(m model) string {
 	// pad to viewport width
-	const help = ` ↑/↓: Scroll • tab: Focus • q: Quit `
+	help := ` ↑/↓: Scroll • tab: Focus • q: Quit `
+	if m.path != "fs/root.md" {
+		help += " • esc: Back"
+	}
+
 	width := min(m.viewport.Width, 74)
 
 	padded := lipgloss.Place(width, 1, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render(help), lipgloss.WithWhitespaceChars("-"), lipgloss.WithWhitespaceForeground(subtle))
