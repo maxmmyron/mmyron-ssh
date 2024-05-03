@@ -35,6 +35,7 @@ var (
 	// highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
 	special   = lipgloss.AdaptiveColor{Light: "#DB22CE", Dark: "#DB46CF"}
 	helpStyle = lipgloss.NewStyle().Foreground(subtle).BorderTop(true).BorderTopForeground(subtle).Render
+	selected  = -1
 	paths     = []string{
 		"fs/root.md",
 		"fs/posts/1.md",
@@ -124,37 +125,94 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+func RebuildGlamourViewport(m model) (model, error) {
+	// render content to dynamic size
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dracula"),
+		glamour.WithWordWrap(min(m.viewport.Width, 78)),
+	)
+
+	if err != nil {
+		return m, nil
+	}
+
+	str, err := renderer.Render(m.content)
+
+	if err != nil {
+		return m, nil
+	}
+
+	// if root, then grab all paths to render @ bottom of page (as a selector)
+	if m.path == "fs/root.md" {
+		// render paths
+		pathsStr := ""
+
+		for i, p := range paths {
+			if i == selected {
+				pathsStr += lipgloss.NewStyle().Foreground(special).Render(fmt.Sprintf(" %s ", p))
+			} else {
+				pathsStr += fmt.Sprintf(" %s ", p)
+			}
+		}
+
+		str += pathsStr
+	}
+
+	m.viewport.SetContent(lipgloss.Place(m.viewport.Width, m.viewport.Height, lipgloss.Center, lipgloss.Top, str))
+
+	return m, nil
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		// set viewport to window size
 		m.viewport.Width = msg.Width
 		m.viewport.Height = msg.Height - 5
-		m.viewport.Style = lipgloss.NewStyle().Width(msg.Width).Height(msg.Height)
-
-		// render content to dynamic size
-		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("dracula"),
-			glamour.WithWordWrap(min(msg.Width, 78)),
-		)
-
-		if err != nil {
-			return m, nil
-		}
-
-		str, err := renderer.Render(m.content)
-
-		if err != nil {
-			return m, nil
-		}
-
-		m.viewport.SetContent(lipgloss.Place(msg.Width, msg.Height, lipgloss.Center, lipgloss.Top, str))
-
-		return m, nil
+		m.viewport.Style = lipgloss.NewStyle().Width(m.viewport.Width).Height(m.viewport.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "esc":
+			if m.path != "fs/root.md" {
+				m.path = "fs/root.md"
+				selected = -1
+				content, err := os.ReadFile(m.path)
+
+				if err != nil {
+					return m, nil
+				}
+
+				m.content = string(content)
+
+			} else {
+				// quit if on root page
+				return m, tea.Quit
+			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "tab":
+			if m.path != "fs/root.md" {
+				return m, nil
+			}
+
+			selected = (selected + 1) % len(paths)
+		case "shift+tab":
+			if m.path == "fs/root.md" {
+				return m, nil
+			}
+
+			selected = (selected - 1) % len(paths)
+		case "enter":
+			if selected != -1 && paths[selected] != m.path {
+				m.path = paths[selected]
+				content, err := os.ReadFile(m.path)
+
+				if err != nil {
+					return m, nil
+				}
+
+				m.content = string(content)
+
+			}
 		default:
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
@@ -163,6 +221,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+
+	// if we don't exit early, we need to rerender the content
+	m, err := RebuildGlamourViewport(m)
+
+	if err != nil {
+		fmt.Println("Could not rerender content:", err)
+	}
+
+	return m, nil
 }
 
 func (m model) View() string {
