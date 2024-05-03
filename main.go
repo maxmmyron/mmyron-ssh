@@ -202,7 +202,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.content = string(content)
-
+				m.viewport.SetYOffset(0)
 			} else {
 				// quit if on root page
 				return m, tea.Quit
@@ -232,7 +232,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.content = string(content)
-
+				m.viewport.SetYOffset(0)
 			}
 		default:
 			var cmd tea.Cmd
