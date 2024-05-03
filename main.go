@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/76creates/stickers"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
@@ -20,15 +20,28 @@ import (
 	"github.com/charmbracelet/wish/activeterm"
 	"github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+	"golang.org/x/term"
 )
 
 const (
 	useHighPerformanceRenderer = false
 	host                       = "localhost"
 	port                       = "23234"
+	width                      = 80
 )
 
-var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render
+var (
+	subtle = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
+	// highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	special   = lipgloss.AdaptiveColor{Light: "#DB22CE", Dark: "#DB46CF"}
+	helpStyle = lipgloss.NewStyle().Foreground(subtle).BorderTop(true).BorderTopForeground(subtle).Render
+	paths     = []string{
+		"fs/root.md",
+		"fs/posts/1.md",
+		"fs/posts/2.md",
+		"fs/posts/3.md",
+	}
+)
 
 func main() {
 	srv, err := wish.NewServer(
@@ -84,59 +97,27 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 }
 
 func CreateModel() (*model, error) {
-	const defaultWidth = 78
-	const defaultHeight = 20
+	physWidth, physHeight, _ := term.GetSize(int(os.Stdout.Fd()))
 
-	vp := viewport.New(defaultWidth, defaultHeight)
-	vp.Style = lipgloss.NewStyle().Width(defaultWidth).Height(defaultHeight).Background(lipgloss.Color("241"))
+	vp := viewport.New(physWidth, physHeight)
 
-	flexBox := stickers.NewFlexBox(0, 0)
+	content, err := os.ReadFile("fs/root.md")
 
-	row := stickers.FlexBoxRow{}
-
-	row.AddCells([]*stickers.FlexBoxCell{
-		stickers.NewFlexBoxCell(1, 1).SetStyle(lipgloss.NewStyle().Background(lipgloss.Color("#fc5c65"))),
-		stickers.NewFlexBoxCell(1, 1).SetStyle(lipgloss.NewStyle().Background(lipgloss.Color("#fd9644"))),
-		stickers.NewFlexBoxCell(1, 1).SetStyle(lipgloss.NewStyle().Background(lipgloss.Color("#fed330"))),
-	})
-
-	flexBox.AddRows([]*stickers.FlexBoxRow{&row})
-
-	// vp.Style = lipgloss.NewStyle().
-	// 	Align(lipgloss.Center).
-	// 	BorderStyle(lipgloss.RoundedBorder()).
-	// 	BorderForeground(lipgloss.Color("62")).
-	// 	PaddingRight(2)
-
-	// renderer, err := glamour.NewTermRenderer(
-	// 	glamour.WithAutoStyle(),
-	// 	glamour.WithWordWrap(defaultWidth),
-	// )
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// content, err := os.ReadFile("fs/root.md")
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// str, err := renderer.Render(string(content))
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// vp.SetContent(str)
+	if err != nil {
+		return nil, err
+	}
 
 	return &model{
 		viewport: vp,
-		flexbox:  flexBox,
+		path:     "fs/root.md",
+		content:  string(content),
 	}, nil
 }
 
 type model struct {
 	viewport viewport.Model
-	flexbox  *stickers.FlexBox
+	path     string
+	content  string
 }
 
 func (m model) Init() tea.Cmd {
@@ -146,21 +127,33 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.viewport.Height = msg.Height - 2
+		// set viewport to window size
 		m.viewport.Width = msg.Width
-		m.viewport.Style = m.viewport.Style.Width(msg.Width).Height(msg.Height)
-		m.flexbox.SetWidth(msg.Width)
-		m.flexbox.SetHeight(msg.Height)
+		m.viewport.Height = msg.Height - 5
+		m.viewport.Style = lipgloss.NewStyle().Width(msg.Width).Height(msg.Height)
 
-		row, exists := m.flexbox.GetRow(0)
-		if exists {
-			row.Cell(1).SetContent("Width: " + fmt.Sprint(msg.Width))
+		// render content to dynamic size
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithStandardStyle("dracula"),
+			glamour.WithWordWrap(min(msg.Width, 78)),
+		)
+
+		if err != nil {
+			return m, nil
 		}
+
+		str, err := renderer.Render(m.content)
+
+		if err != nil {
+			return m, nil
+		}
+
+		m.viewport.SetContent(lipgloss.Place(msg.Width, msg.Height, lipgloss.Center, lipgloss.Top, str))
 
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c", "esc":
+		case "q", "ctrl+c":
 			return m, tea.Quit
 		default:
 			var cmd tea.Cmd
@@ -173,10 +166,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// return m.viewport.View() + helpView()
-	return m.flexbox.Render()
+	return pathView(m) + m.viewport.View() + "\n" + helpView(m)
 }
 
-func helpView() string {
-	return helpStyle("\n  ↑/↓: Navigate • q: Quit\n")
+func pathView(m model) string {
+	path := fmt.Sprintf(" %s ", m.path)
+	width := min(m.viewport.Width, 74)
+
+	padded := lipgloss.Place(width, 1, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render(path), lipgloss.WithWhitespaceChars("-"), lipgloss.WithWhitespaceForeground(subtle))
+	return lipgloss.Place(m.viewport.Width, 2, lipgloss.Center, lipgloss.Center, padded)
+}
+
+func helpView(m model) string {
+	// pad to viewport width
+	const help = ` ↑/↓: Scroll • tab: Focus • q: Quit `
+	width := min(m.viewport.Width, 74)
+
+	padded := lipgloss.Place(width, 1, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render(help), lipgloss.WithWhitespaceChars("-"), lipgloss.WithWhitespaceForeground(subtle))
+	return lipgloss.Place(m.viewport.Width, 3, lipgloss.Center, lipgloss.Center, padded)
 }
