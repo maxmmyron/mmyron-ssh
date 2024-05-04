@@ -35,8 +35,8 @@ func (p post) Description() string { return p.desc }
 func (p post) FilterValue() string { return p.title }
 
 const (
-	headerHeight               = 4
-	footerHeight               = 2
+	headerHeight               = 5
+	footerHeight               = 5
 	useHighPerformanceRenderer = false
 	host                       = "localhost"
 	port                       = "23234"
@@ -45,12 +45,14 @@ const (
 )
 
 var (
+	loaded           = false
 	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#D7D7D7"}).Render
 	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
+	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#3F3F3F"}).Render
 	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#F93EFD"}).Render
-	tableBorderColor = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F3F"})
+	tableBorderColor = lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F3F"}
 	posts            = []list.Item{
-		post{title: "Post 1", path: "/posts/1", desc: "2021-01-01"},
+		post{title: "Improving gradients in TailwindCSS", path: "/posts/gradients", desc: "An unnecessarily deep dive into improving a teeny subset of TailwindCSS's utility classes."},
 		post{title: "Post 2", path: "/posts/2", desc: "2021-01-02"},
 		post{title: "Post 3", path: "/posts/3", desc: "2021-01-03"},
 	}
@@ -117,18 +119,10 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	computedWidth := min(physWidth, glamourMaxWidth)
 
 	vp := viewport.New(physWidth, physHeight-headerHeight-footerHeight)
-
-	// get root page content
-	content, err := os.ReadFile("fs/root.md")
-
-	if err != nil {
-		fmt.Println("Could not read root content:", err)
-	}
+	vp.HighPerformanceRendering = useHighPerformanceRenderer
 
 	m := model{
 		viewport: vp,
-		path:     "/root",
-		content:  string(content),
 		list:     list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight),
 	}
 
@@ -149,28 +143,27 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
-// grabs a page's content
-func ReadPageContent(path string) (string, error) {
-	// if we're at the posts page, return early
+func UpdatePage(m model, path string) (model, tea.Cmd) {
 	if path == "/posts" {
-		return "", nil
+		m.path = path
+		m.viewport.SetYOffset(0)
+		return m, nil
 	}
 
+	fmt.Println("Navigating to", path)
+	// if we don't exit early, we've navigated to a new page. We need to read the content and rebuild the glamour viewport
 	content, err := os.ReadFile("fs" + path + ".md")
 
 	if err != nil {
-		return "", err
+		fmt.Println("Could not read content:", err)
+		return m, nil
 	}
 
-	return string(content), nil
-}
+	fmt.Println("gooda")
+	m.path = path
+	m.content = string(content)
+	m.viewport.SetYOffset(0)
 
-// This rebuilds the glamour viewport with the new content. This mainly runs in two cases:
-//  1. when the user navigates to a new page and we need to update the glamour viewport with new content
-//  2. when the user selects a new option from the list of paths
-//     TODO: case 2 probably doesn't require renderer to be rebuilt, so optimize this in future
-func RebuildGlamourViewport(m model) (model, error) {
-	// NOTE: it seems like glamour adds like 2ch of padding on each side, so we account for that here.
 	width := min(m.viewport.Width, glamourMaxWidth)
 
 	// render content to dynamic size
@@ -183,16 +176,15 @@ func RebuildGlamourViewport(m model) (model, error) {
 		return m, nil
 	}
 
+	fmt.Println("goodb")
+
 	str, err := renderer.Render(m.content)
 
 	if err != nil {
 		return m, nil
 	}
 
-	// if posts, return early.
-	if m.path == "/posts" {
-		return m, nil
-	}
+	fmt.Println("goodc")
 
 	m.viewport.SetContent(lipgloss.Place(m.viewport.Width, m.viewport.Height, lipgloss.Center, lipgloss.Top, str))
 
@@ -201,15 +193,30 @@ func RebuildGlamourViewport(m model) (model, error) {
 
 // struct method: Update() returns a new model and command to run based on the message received
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
+
 	switch msg := msg.(type) {
 	// handle window resize
 	case tea.WindowSizeMsg:
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - headerHeight - footerHeight
+		m.viewport.Height = msg.Height - headerHeight - footerHeight + 1
+		m.viewport.YPosition = headerHeight
 		m.viewport.Style = lipgloss.NewStyle().Width(m.viewport.Width).Height(m.viewport.Height)
 
 		m.list.SetWidth(m.viewport.Width)
-		m.list.SetHeight(msg.Height - headerHeight - 1) // account for extra newlines in View()
+		m.list.SetHeight(msg.Height - headerHeight - 2) // account for extra newlines in View()
+
+		if !loaded {
+			m, cmd = UpdatePage(m, "/root")
+			loaded = true
+		}
+
+		if useHighPerformanceRenderer {
+			cmds = append(cmds, viewport.Sync(m.viewport))
+		}
 
 	// handle key presses
 	case tea.KeyMsg:
@@ -221,18 +228,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.path == "/posts" {
-				// if we're at the posts page, then we need to navigate back to root
-				m.path = "/root"
+				return UpdatePage(m, "/root")
 			} else {
-				// if we're at a post, then we need to navigate back to posts
-				m.path = "/posts"
+				return UpdatePage(m, "/posts")
 			}
 		case "p":
 			if m.path == "/posts" {
 				// if we're already at posts, then do nothing
 				return m, nil
 			}
-			m.path = "/posts"
+			return UpdatePage(m, "/posts")
 		case "enter":
 			if m.path == "/posts" {
 				// if we're at the posts page, then we need to navigate to the selected post
@@ -240,54 +245,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if selected == nil {
 					return m, nil
 				}
-				m.path = selected.(post).Path()
+				return UpdatePage(m, selected.(post).Path())
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		default:
-			var cmd tea.Cmd
-			if m.path != "/posts" {
-				m.viewport, cmd = m.viewport.Update(msg)
-			} else {
-				m.list, cmd = m.list.Update(msg)
-			}
-			return m, cmd
 		}
-	default:
-		return m, nil
 	}
 
-	// if we don't exit early, we've navigated to a new page. We need to read the content and rebuild the glamour viewport
-	content, err := ReadPageContent(m.path)
-
-	if err != nil {
-		fmt.Println("Could not read content:", err)
-		return m, nil
+	if m.path != "/posts" {
+		m.viewport, cmd = m.viewport.Update(msg)
+	} else {
+		m.list, cmd = m.list.Update(msg)
 	}
 
-	m.content = content
-	m.viewport.SetYOffset(0)
-
-	m, err = RebuildGlamourViewport(m)
-
-	if err != nil {
-		fmt.Println("Could not rerender content:", err)
-		return m, nil
-	}
-
-	return m, nil
+	cmds = append(cmds, cmd)
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
 	if m.path == "/posts" {
 		return HeaderView(m) + "\n" + ListView(m)
 	}
-	return HeaderView(m) + m.viewport.View() + helpView(m)
+
+	return HeaderView(m) + m.viewport.View() + HelpView(m)
 }
 
 // center the list
 func ListView(m model) string {
-	maxWidth := min(m.viewport.Width, glamourMaxWidth-2)
+	maxWidth := min(m.viewport.Width, viewportMaxWidth+2)
 
 	listContainer := lipgloss.NewStyle().Width(maxWidth).AlignHorizontal(lipgloss.Left).SetString(m.list.View())
 	listView := lipgloss.NewStyle().Width(m.viewport.Width).AlignHorizontal(lipgloss.Center).SetString(listContainer.Render())
@@ -326,19 +311,29 @@ func HeaderView(m model) string {
 		altStyle  = lipgloss.NewStyle().Width(altLinkWidth).Padding(0, linkPadding).Render
 	)
 
-	t := table.New().BorderColumn(true).Width(maxWidth).Border(lipgloss.NormalBorder()).BorderStyle(tableBorderColor)
+	t := table.New().BorderColumn(true).Width(maxWidth).Border(lipgloss.NormalBorder()).BorderStyle(lipgloss.NewStyle().Foreground(tableBorderColor))
 	t.Row(pathStyle(content), altStyle(sideContent))
 
-	return lipgloss.NewStyle().Width(m.viewport.Width).Height(5).Align(lipgloss.Center, lipgloss.Center).SetString(t.Render()).Render()
+	container := lipgloss.NewStyle().Width(m.viewport.Width).Height(headerHeight).Align(lipgloss.Center, lipgloss.Center).SetString(t.Render()).Render()
+
+	return container
 }
 
-func helpView(m model) string {
-	help := `↑/↓ scroll • q quit`
-	container := lipgloss.NewStyle().
-		Width(m.viewport.Width).Height(3).
-		Foreground(lipgloss.Color("#666")).
-		AlignHorizontal(lipgloss.Center).AlignVertical(lipgloss.Bottom).
-		SetString(help)
+func HelpView(m model) string {
+	// ▲/▼ scroll  •  q quit
+	scrollHelp := fmt.Sprintf("%s %s", ApplyHighlight("▲/▼"), ApplySubtle("scroll"))
+	quitHelp := fmt.Sprintf("%s %s", ApplyHighlight("q"), ApplySubtle("quit"))
+	help := fmt.Sprintf("%s  %s  %s", scrollHelp, ApplyMuted("•"), quitHelp)
 
-	return container.Render()
+	maxWidth := min(m.viewport.Width, viewportMaxWidth)
+
+	helpSection := lipgloss.NewStyle().
+		Width(maxWidth).Height(2).
+		Border(lipgloss.NormalBorder(), true, false, false).BorderForeground(tableBorderColor).
+		Align(lipgloss.Center, lipgloss.Bottom).
+		SetString(help).Render()
+
+	container := lipgloss.Place(m.viewport.Width, 4, lipgloss.Center, lipgloss.Bottom, helpSection)
+
+	return container
 }
