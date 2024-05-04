@@ -126,6 +126,8 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		list:     list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight),
 	}
 
+	loaded = false
+
 	m.list.Title = "Recent Posts"
 
 	return m, []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
