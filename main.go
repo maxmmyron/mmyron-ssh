@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -23,38 +24,37 @@ import (
 	"golang.org/x/term"
 )
 
+type post struct {
+	title, path, desc string
+}
+
+func (p post) Title() string       { return p.title }
+func (p post) Path() string        { return p.path }
+func (p post) Description() string { return p.desc }
+func (p post) FilterValue() string { return p.title }
+
 const (
+	headerHeight               = 4
+	footerHeight               = 2
 	useHighPerformanceRenderer = false
 	host                       = "localhost"
 	port                       = "23234"
-	width                      = 80
+	glamourMaxWidth            = 78
+	viewportMaxWidth           = 80
 )
 
 var (
-	linkBorder = lipgloss.Border{
-		Top:         "─",
-		Bottom:      "─",
-		Left:        "│",
-		Right:       "│",
-		TopLeft:     "╭",
-		TopRight:    "╮",
-		BottomLeft:  "╰",
-		BottomRight: "╯",
-	}
-
-	subtle = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
-	// highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	special  = lipgloss.AdaptiveColor{Light: "#DB22CE", Dark: "#DB46CF"}
-	selected = -1
-	paths    = []string{
-		"fs/root.md",
-		"fs/posts/1.md",
-		"fs/posts/2.md",
-		"fs/posts/3.md",
+	posts = []list.Item{
+		post{title: "Post 1", path: "/posts/1", desc: "2021-01-01"},
+		post{title: "Post 2", path: "/posts/2", desc: "2021-01-02"},
+		post{title: "Post 3", path: "/posts/3", desc: "2021-01-03"},
 	}
 )
 
 func main() {
+	// set glamour env
+	os.Setenv("GLAMOUR_STYLE", "./style.json")
+
 	// set up a new wish server. This allows us to serve a terminal UI over SSH
 	srv, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
@@ -109,28 +109,34 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	// get the width/height of the viewport for a rough initial size estimate
 	physWidth, physHeight, _ := term.GetSize(int(os.Stdout.Fd()))
 
-	vp := viewport.New(physWidth, physHeight)
+	computedWidth := min(physWidth, glamourMaxWidth)
 
+	vp := viewport.New(physWidth, physHeight-headerHeight-footerHeight)
+
+	// get root page content
 	content, err := os.ReadFile("fs/root.md")
 
 	if err != nil {
-		fmt.Println("Could not read root.md:", err)
-		return model{}, nil
+		fmt.Println("Could not read root content:", err)
 	}
 
 	m := model{
 		viewport: vp,
-		path:     "fs/root.md",
+		path:     "/root",
 		content:  string(content),
+		list:     list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight),
 	}
+
+	m.list.Title = "Recent Posts"
 
 	return m, []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
 }
 
 type model struct {
-	viewport viewport.Model
-	path     string
-	content  string
+	viewport viewport.Model // current viewport
+	path     string         // current path we're supposed to be rendering. also used in rendering the header
+	content  string         // content to render in the viewport
+	list     list.Model
 }
 
 // struct method: Init() returns a command to run when the program starts
@@ -138,16 +144,33 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+// grabs a page's content
+func ReadPageContent(path string) (string, error) {
+	// if we're at the posts page, return early
+	if path == "/posts" {
+		return "", nil
+	}
+
+	content, err := os.ReadFile("fs" + path + ".md")
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+}
+
 // This rebuilds the glamour viewport with the new content. This mainly runs in two cases:
 //  1. when the user navigates to a new page and we need to update the glamour viewport with new content
 //  2. when the user selects a new option from the list of paths
 //     TODO: case 2 probably doesn't require renderer to be rebuilt, so optimize this in future
 func RebuildGlamourViewport(m model) (model, error) {
-	width := min(m.viewport.Width, 78)
+	// NOTE: it seems like glamour adds like 2ch of padding on each side, so we account for that here.
+	width := min(m.viewport.Width, glamourMaxWidth)
 
 	// render content to dynamic size
 	renderer, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dracula"),
+		glamour.WithEnvironmentConfig(),
 		glamour.WithWordWrap(width),
 	)
 
@@ -161,28 +184,9 @@ func RebuildGlamourViewport(m model) (model, error) {
 		return m, nil
 	}
 
-	// if root, then grab all paths to render @ bottom of page (as a selector)
-	if m.path == "fs/root.md" {
-		// render paths
-		pathsStr := ""
-
-		// from 1 - len(paths)
-		for i, p := range paths {
-			if p == m.path {
-				continue
-			}
-
-			if i == selected {
-				link := lipgloss.Place(width, 3, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render("> "+p))
-				pathsStr += "\n" + link
-			} else {
-				link := lipgloss.Place(width, 3, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(subtle).Render("  "+p))
-				pathsStr += "\n" + link
-			}
-
-		}
-
-		str += pathsStr
+	// if posts, return early.
+	if m.path == "/posts" {
+		return m, nil
 	}
 
 	m.viewport.SetContent(lipgloss.Place(m.viewport.Width, m.viewport.Height, lipgloss.Center, lipgloss.Top, str))
@@ -196,62 +200,70 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// handle window resize
 	case tea.WindowSizeMsg:
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 5
+		m.viewport.Height = msg.Height - headerHeight - footerHeight
 		m.viewport.Style = lipgloss.NewStyle().Width(m.viewport.Width).Height(m.viewport.Height)
+
+		m.list.SetWidth(m.viewport.Width)
+		m.list.SetHeight(msg.Height - headerHeight - 1) // account for extra newlines in View()
 
 	// handle key presses
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
-			// go back to root path if not already there
-			if m.path != "fs/root.md" {
-				m.path = "fs/root.md"
-				selected = -1
-				content, err := os.ReadFile(m.path)
+		case "b":
+			// if we're not at root level (i.e. not /root or /posts), then nav to root
+			if m.path != "/root" {
+				m.path = "/root"
+
+				content, err := ReadPageContent(m.path)
 
 				if err != nil {
 					return m, nil
 				}
 
-				// update content and reset scroll position, since we're on a new page
-				m.content = string(content)
+				m.content = content
 				m.viewport.SetYOffset(0)
-			} else {
-				// if we're already at root, then quit
-				return m, tea.Quit
+			}
+		case "p":
+			if m.path == "/posts" {
+				// if we're already at posts, then do nothing
+				return m, nil
+			}
+			m.path = "/posts"
+
+			content, err := ReadPageContent(m.path)
+
+			if err != nil {
+				return m, nil
+			}
+
+			m.content = content
+			m.viewport.SetYOffset(0)
+		case "enter":
+			if m.path == "/posts" {
+				// if we're at the posts page, then we need to navigate to the selected post
+				selected := m.list.SelectedItem()
+				if selected != nil {
+					// wait what kind of syntax sorcery is this???
+					m.path = selected.(post).Path()
+					content, err := ReadPageContent(m.path)
+
+					if err != nil {
+						return m, nil
+					}
+
+					m.content = content
+					m.viewport.SetYOffset(0)
+				}
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case "tab":
-			if m.path != "fs/root.md" {
-				return m, nil
-			}
-
-			selected = (selected + 1) % len(paths)
-		case "shift+tab":
-			// FIXME: this is not working
-			if m.path == "fs/root.md" {
-				return m, nil
-			}
-
-			selected = (selected - 1) % len(paths)
-		case "enter":
-			// if we're at root and we've selected a path (that isn't root), then navigate to that path
-			if selected != -1 && paths[selected] != m.path {
-				m.path = paths[selected]
-				content, err := os.ReadFile(m.path)
-
-				if err != nil {
-					return m, nil
-				}
-
-				// update content and reset scroll position, since we're on a new page
-				m.content = string(content)
-				m.viewport.SetYOffset(0)
-			}
 		default:
 			var cmd tea.Cmd
-			m.viewport, cmd = m.viewport.Update(msg)
+			if m.path != "/posts" {
+				m.viewport, cmd = m.viewport.Update(msg)
+			} else {
+				m.list, cmd = m.list.Update(msg)
+			}
 			return m, cmd
 		}
 	default:
@@ -269,26 +281,67 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return pathView(m) + m.viewport.View() + "\n" + helpView(m)
+	if m.path == "/posts" {
+		return HeaderView(m) + "\n" + ListView(m)
+	}
+	return HeaderView(m) + m.viewport.View() + helpView(m)
 }
 
-func pathView(m model) string {
-	path := fmt.Sprintf(" %s ", m.path)
-	width := min(m.viewport.Width, 74)
+// center the list
+func ListView(m model) string {
+	maxWidth := min(m.viewport.Width, glamourMaxWidth-2)
 
-	padded := lipgloss.Place(width, 1, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render(path), lipgloss.WithWhitespaceChars("-"), lipgloss.WithWhitespaceForeground(subtle))
-	return lipgloss.Place(m.viewport.Width, 2, lipgloss.Center, lipgloss.Center, padded)
+	listContainer := lipgloss.NewStyle().Width(maxWidth).AlignHorizontal(lipgloss.Left).SetString(m.list.View())
+	listView := lipgloss.NewStyle().Width(m.viewport.Width).AlignHorizontal(lipgloss.Center).SetString(listContainer.Render())
+	return listView.Render()
+}
+
+// builds out the header, which is shown on all pages
+func HeaderView(m model) string {
+	const (
+		altLinkWidth = 11
+		minMargin    = 8
+		linkPadding  = 2
+	)
+
+	sidePath := "p posts"
+	if m.path != "/root" {
+		sidePath = "b back"
+	}
+
+	maxWidth := min(m.viewport.Width, viewportMaxWidth)
+
+	pathSectionWidth := maxWidth - altLinkWidth - minMargin
+	pathContentWidth := pathSectionWidth - 2 - 2*linkPadding // 2 for the border, 4 for the padding
+	margin := minMargin
+
+	// truncate path if it's too long
+	path := m.path
+	if len(m.path) > pathContentWidth {
+		path = path[:pathContentWidth-4] + "..."
+	} else {
+		pathSectionWidth = len(path) + 2 + 2*linkPadding
+		margin = maxWidth - pathSectionWidth - altLinkWidth
+	}
+
+	pathSection := lipgloss.NewStyle().Width(pathSectionWidth).Border(lipgloss.NormalBorder(), true).Padding(0, linkPadding).MarginRight(margin - 4).SetString(path)
+	altSection := lipgloss.NewStyle().Width(altLinkWidth).Border(lipgloss.NormalBorder(), true).Padding(0, linkPadding).SetString(sidePath)
+
+	header := lipgloss.NewStyle().
+		Width(m.viewport.Width).Height(headerHeight).
+		AlignHorizontal(lipgloss.Center).AlignVertical(lipgloss.Top).
+		SetString(lipgloss.JoinHorizontal(lipgloss.Top, pathSection.Render(), altSection.Render()))
+
+	return header.Render()
 }
 
 func helpView(m model) string {
-	// pad to viewport width
-	help := ` ↑/↓: Scroll • tab: Focus • q: Quit `
-	if m.path != "fs/root.md" {
-		help += " • esc: Back"
-	}
+	help := `↑/↓ scroll • q quit`
+	container := lipgloss.NewStyle().
+		Width(m.viewport.Width).Height(3).
+		Foreground(lipgloss.Color("#666")).
+		AlignHorizontal(lipgloss.Center).AlignVertical(lipgloss.Bottom).
+		SetString(help)
 
-	width := min(m.viewport.Width, 74)
-
-	padded := lipgloss.Place(width, 1, lipgloss.Left, lipgloss.Center, lipgloss.NewStyle().Foreground(special).Render(help), lipgloss.WithWhitespaceChars("-"), lipgloss.WithWhitespaceForeground(subtle))
-	return lipgloss.Place(m.viewport.Width, 3, lipgloss.Center, lipgloss.Center, padded)
+	return container.Render()
 }
