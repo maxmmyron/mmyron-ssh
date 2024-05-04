@@ -130,7 +130,8 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 
 	m.list.Title = "Recent Posts"
 
-	return m, []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
+	// dont use tea.WithMouseCellMotion() because it seems to break the viewport when scrolling fast
+	return m, []tea.ProgramOption{tea.WithAltScreen()}
 }
 
 type model struct {
@@ -148,7 +149,8 @@ func (m model) Init() tea.Cmd {
 func UpdatePage(m model, path string) (model, tea.Cmd) {
 	if path == "/posts" {
 		m.path = path
-		m.viewport.SetYOffset(0)
+		// m.viewport.SetYOffset(0)
+		m.viewport.SetContent("")
 		return m, nil
 	}
 
@@ -211,16 +213,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.SetWidth(m.viewport.Width)
 		m.list.SetHeight(msg.Height - headerHeight - 2) // account for extra newlines in View()
 
+		// if we haven't full loaded yet, then we need to load page content
 		if !loaded {
-			m, cmd = UpdatePage(m, "/root")
+			m, _ = UpdatePage(m, "/root")
 			loaded = true
 		}
 
+		// in high rendering mode, we need to resync the viewport (akin to rerender)
 		if useHighPerformanceRenderer {
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
-
-	// handle key presses
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "b":
@@ -230,16 +232,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.path == "/posts" {
-				return UpdatePage(m, "/root")
+				m, _ = UpdatePage(m, "/root")
 			} else {
-				return UpdatePage(m, "/posts")
+				m, _ = UpdatePage(m, "/posts")
 			}
 		case "p":
 			if m.path == "/posts" {
 				// if we're already at posts, then do nothing
 				return m, nil
 			}
-			return UpdatePage(m, "/posts")
+			m, _ = UpdatePage(m, "/posts")
 		case "enter":
 			if m.path == "/posts" {
 				// if we're at the posts page, then we need to navigate to the selected post
@@ -247,13 +249,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if selected == nil {
 					return m, nil
 				}
-				return UpdatePage(m, selected.(post).Path())
+				m, _ = UpdatePage(m, selected.(post).Path())
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
 	}
 
+	// handle default keyboard/mouse events for viewport/list, depending on route
 	if m.path != "/posts" {
 		m.viewport, cmd = m.viewport.Update(msg)
 	} else {
@@ -265,11 +268,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.path == "/posts" {
-		return HeaderView(m) + "\n" + ListView(m)
+	fmt.Println("Updating render for", m.path)
+	var view string
+	switch m.path {
+	case "/posts":
+		view = "\n" + ListView(m)
+	default:
+		view = m.viewport.View() + HelpView(m)
 	}
 
-	return HeaderView(m) + m.viewport.View() + HelpView(m)
+	return HeaderView(m) + view
 }
 
 // center the list
