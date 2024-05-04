@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
@@ -44,7 +45,11 @@ const (
 )
 
 var (
-	posts = []list.Item{
+	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#D7D7D7"}).Render
+	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
+	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#F93EFD"}).Render
+	tableBorderColor = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F3F"})
+	posts            = []list.Item{
 		post{title: "Post 1", path: "/posts/1", desc: "2021-01-01"},
 		post{title: "Post 2", path: "/posts/2", desc: "2021-01-02"},
 		post{title: "Post 3", path: "/posts/3", desc: "2021-01-03"},
@@ -210,18 +215,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "b":
-			// if we're not at root level (i.e. not /root or /posts), then nav to root
-			if m.path != "/root" {
+			if m.path == "/root" {
+				// if we're already at root, then do nothing
+				return m, nil
+			}
+
+			if m.path == "/posts" {
+				// if we're at the posts page, then we need to navigate back to root
 				m.path = "/root"
-
-				content, err := ReadPageContent(m.path)
-
-				if err != nil {
-					return m, nil
-				}
-
-				m.content = content
-				m.viewport.SetYOffset(0)
+			} else {
+				// if we're at a post, then we need to navigate back to posts
+				m.path = "/posts"
 			}
 		case "p":
 			if m.path == "/posts" {
@@ -229,31 +233,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.path = "/posts"
-
-			content, err := ReadPageContent(m.path)
-
-			if err != nil {
-				return m, nil
-			}
-
-			m.content = content
-			m.viewport.SetYOffset(0)
 		case "enter":
 			if m.path == "/posts" {
 				// if we're at the posts page, then we need to navigate to the selected post
 				selected := m.list.SelectedItem()
-				if selected != nil {
-					// wait what kind of syntax sorcery is this???
-					m.path = selected.(post).Path()
-					content, err := ReadPageContent(m.path)
-
-					if err != nil {
-						return m, nil
-					}
-
-					m.content = content
-					m.viewport.SetYOffset(0)
+				if selected == nil {
+					return m, nil
 				}
+				m.path = selected.(post).Path()
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -270,11 +257,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// if we don't exit early, we need to rerender the content
-	m, err := RebuildGlamourViewport(m)
+	// if we don't exit early, we've navigated to a new page. We need to read the content and rebuild the glamour viewport
+	content, err := ReadPageContent(m.path)
+
+	if err != nil {
+		fmt.Println("Could not read content:", err)
+		return m, nil
+	}
+
+	m.content = content
+	m.viewport.SetYOffset(0)
+
+	m, err = RebuildGlamourViewport(m)
 
 	if err != nil {
 		fmt.Println("Could not rerender content:", err)
+		return m, nil
 	}
 
 	return m, nil
@@ -300,39 +298,38 @@ func ListView(m model) string {
 func HeaderView(m model) string {
 	const (
 		altLinkWidth = 11
-		minMargin    = 8
 		linkPadding  = 2
 	)
 
-	sidePath := "p posts"
-	if m.path != "/root" {
-		sidePath = "b back"
-	}
-
-	maxWidth := min(m.viewport.Width, viewportMaxWidth)
-
-	pathSectionWidth := maxWidth - altLinkWidth - minMargin
-	pathContentWidth := pathSectionWidth - 2 - 2*linkPadding // 2 for the border, 4 for the padding
-	margin := minMargin
-
-	// truncate path if it's too long
-	path := m.path
-	if len(m.path) > pathContentWidth {
-		path = path[:pathContentWidth-4] + "..."
+	// build out text
+	content := m.path
+	sideContent := fmt.Sprintf("%s %s", ApplyHighlight("p"), ApplySubtle("posts"))
+	if content != "/root" {
+		sideContent = fmt.Sprintf("%s %s", ApplyHighlight("b"), ApplySubtle("back"))
 	} else {
-		pathSectionWidth = len(path) + 2 + 2*linkPadding
-		margin = maxWidth - pathSectionWidth - altLinkWidth
+		content = "/"
+	}
+	content = ApplyNormal("mmyron.com" + content)
+
+	// calculate widths for main content
+	maxWidth := min(m.viewport.Width, viewportMaxWidth)
+	mainWidth := maxWidth - altLinkWidth
+	mainContentWidth := mainWidth - 2 - 2*linkPadding // 2 for the border, 4 for the padding
+
+	// truncate if necessary
+	if len(content) > mainContentWidth {
+		content = content[:mainContentWidth-4] + "..."
 	}
 
-	pathSection := lipgloss.NewStyle().Width(pathSectionWidth).Border(lipgloss.NormalBorder(), true).Padding(0, linkPadding).MarginRight(margin - 4).SetString(path)
-	altSection := lipgloss.NewStyle().Width(altLinkWidth).Border(lipgloss.NormalBorder(), true).Padding(0, linkPadding).SetString(sidePath)
+	var (
+		pathStyle = lipgloss.NewStyle().Width(mainContentWidth).Padding(0, linkPadding).Render
+		altStyle  = lipgloss.NewStyle().Width(altLinkWidth).Padding(0, linkPadding).Render
+	)
 
-	header := lipgloss.NewStyle().
-		Width(m.viewport.Width).Height(headerHeight).
-		AlignHorizontal(lipgloss.Center).AlignVertical(lipgloss.Top).
-		SetString(lipgloss.JoinHorizontal(lipgloss.Top, pathSection.Render(), altSection.Render()))
+	t := table.New().BorderColumn(true).Width(maxWidth).Border(lipgloss.NormalBorder()).BorderStyle(tableBorderColor)
+	t.Row(pathStyle(content), altStyle(sideContent))
 
-	return header.Render()
+	return lipgloss.NewStyle().Width(m.viewport.Width).Height(5).Align(lipgloss.Center, lipgloss.Center).SetString(t.Render()).Render()
 }
 
 func helpView(m model) string {
