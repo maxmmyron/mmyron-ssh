@@ -327,9 +327,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // renders our model
 func (m model) View() string {
-
-	fmt.Printf("rendering... %s (vp: %dx%d), (cmd: %dx%d)\n", m.currentPath, m.viewport.Width, m.viewport.Height, m.cmdWidth, m.cmdHeight)
-
 	header := HeaderView(m)
 	footer := FooterView(m)
 
@@ -339,17 +336,13 @@ func (m model) View() string {
 
 	// if we're on the posts page, render that as our "inner" content
 	if m.currentPath == "/posts" {
-		fmt.Printf("rendering posts... %dx%d\n", m.posts.Width(), m.posts.Height())
 		listContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(m.posts.Height()).Align(lipgloss.Center, lipgloss.Top).Background(lipgloss.Color("#ff00ff")).SetString(m.posts.View()).Render()
-		// listContainer := lipgloss.Place(m.fitWidth, m.posts.Height(), lipgloss.Left, lipgloss.Top, m.posts.View())
 		inner = lipgloss.Place(m.cmdWidth, m.posts.Height(), lipgloss.Center, lipgloss.Top, listContainer)
 	}
 
 	combinedVp := lipgloss.JoinVertical(lipgloss.Top, header, inner, footer)
 
-	outer := lipgloss.NewStyle().Width(m.cmdWidth).Height(m.cmdHeight).Background(lipgloss.Color("#ff0000")).Align(lipgloss.Center, lipgloss.Top)
-
-	return outer.Render(combinedVp)
+	return lipgloss.NewStyle().Width(m.cmdWidth).Height(m.cmdHeight).Background(lipgloss.Color("#ff0000")).Align(lipgloss.Center, lipgloss.Top).Render(combinedVp)
 }
 
 func HeaderView(m model) string {
@@ -385,9 +378,7 @@ func HeaderView(m model) string {
 	t := table.New().BorderColumn(true).Width(m.fitWidth).Border(lipgloss.NormalBorder()) // .BorderStyle(lipgloss.NewStyle().Foreground(tableBorderColor))
 	t.Row(pathStyle(content), altStyle(sideContent))
 
-	container := lipgloss.NewStyle().Width(m.cmdWidth).Height(headerHeight).Align(lipgloss.Center, lipgloss.Top).Background(lipgloss.Color("#0000ff")).SetString(t.Render()).Render()
-
-	return container
+	return lipgloss.NewStyle().Width(m.cmdWidth).Height(headerHeight).Align(lipgloss.Center, lipgloss.Top).Background(lipgloss.Color("#0000ff")).SetString(t.Render()).Render()
 }
 
 func FooterView(m model) string {
@@ -400,8 +391,4 @@ func FooterView(m model) string {
 	borderContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(footerHeight-1).Align(lipgloss.Center, lipgloss.Bottom).Border(lipgloss.NormalBorder(), true, false, false).BorderForeground(lipgloss.Color("#00ffff")).SetString(helpSection).Render()
 
 	return lipgloss.Place(m.cmdWidth, footerHeight, lipgloss.Center, lipgloss.Bottom, borderContainer)
-
-	// container := lipgloss.Place(m.cmdWidth, footerHeight, lipgloss.Center, lipgloss.Bottom, helpSection)
-
-	// return container
 }
