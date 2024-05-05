@@ -21,7 +21,7 @@ Tailwind is definitely polarizing. We don’t need to swap between HTML and CSS 
 </main>
 ```
 
-Yeah… holy smokes (•\_•)!! I can understand why a pretty nasty element like that can be pretty cumbersome and off-putting to someone unfamiliar with the syntax. By being utility-first, Tailwind confronts the standard way we write CSS. It's different, no doubt, but I think it's a little easy to conflate _different_ or _verbose_ with _bad_ and _unmaintainable_.
+Yeah… holy smokes I can understand why a pretty nasty element like that can be pretty cumbersome and off-putting to someone unfamiliar with the syntax. By being utility-first, Tailwind confronts the standard way we write CSS. It's different, no doubt, but I think it's a little easy to conflate _different_ or _verbose_ with _bad_ and _unmaintainable_.
 
 I personally find Tailwind to fall a little short in a few places—and I think the way that Tailwind handles gradients is in sore need of a revisit. So, in this post, we’ll do exactly that! We’ll work with the Tailwind plugin API to improve and extend the existing set of utility classes that Tailwind provides to deal with gradients.
 
@@ -118,7 +118,7 @@ linear-gradient(35deg in oklab, /* ... */);
 The `35deg` satisfies the `[ <angle> | to <side-or-corner> ]` syntax, and the `in oklab` satisfies the `<color-interpolation-method>` syntax.
 On the left side of this double bar (`||`) is another set of brackets that enclose `<angle> | to <side-or-corner>`. Here, the **single bar** (`|`) combinator tells us that we choose _only one_ of the components within its scope. In this case, we can choose _either_ an `<angle>` (like `35deg`) or a `to <side-or-corner>` component (like `to top left`).
 
-There’s a lot to it, but reading the syntax isn’t too bad, I promise! (ﾉ ◕ ヮ ◕)ﾉ\*:･ﾟ ✧
+There’s a lot to it, but reading the syntax isn’t too bad, I promise!
 
 Ultimately, there are a few general components to focus on:
 
@@ -261,7 +261,7 @@ Just for completeness, here’s the full list of the linear gradient angle utili
 
 ## Implementing color space interpolation
 
-The [`<color-interpolation-method>` data type](https://www.w3.org/TR/css-color-4/#interpolation-space) is a relatively new addition to gradient functions. With this new data type, we can specify the **color space** \*\*that the gradient will use to interpolate between colors.
+The [`<color-interpolation-method>` data type](https://www.w3.org/TR/css-color-4/#interpolation-space) is a relatively new addition to gradient functions. With this new data type, we can specify the **color space** that the gradient will use to interpolate between colors.
 
 ### What are color spaces, even?
 
@@ -271,15 +271,11 @@ Different color spaces give us different ways of accessing colors and have diffe
 
 This is highly relevant when it comes to gradients since these are _all about_ moving around a color space! If we interpolate from one color to another in sRGB, we aren’t guaranteed a perceptually uniform result across the gradient (notice the muted colors in the middle):
 
-<!-- <Media src={srgb_grad_example} alt="A gradient that interpolates between two colors in the sRGB color space." /> -->
-
 But, a gradient that uses a perceptually uniform color space (like Oklab) doesn’t have this issue:
-
-<!-- <Media src={lab_grad_example} alt="A gradient that interpolates between two colors in the LAB color space." /> -->
 
 The difference is subtle. Notice the muted colors in the middle of the sRGB gradient and the more vibrant colors in the middle of the LAB gradient. Because LAB is perceptually uniform, the gradient appears to be more **consistent** in terms of lightness and saturation.
 
-I'm not an expert on this at all. I develop more frequently than I design, so I don't exactly have that precise designer eye. What's worse is that I'm not even well versed enough in the intricacies of color gamuts and spaces to build a neat tool to visualize any of this! Luckily, other people have already done a better job at this than I could probably ever do （_＾-＾_）
+I'm not an expert on this at all. I develop more frequently than I design, so I don't exactly have that precise designer eye. What's worse is that I'm not even well versed enough in the intricacies of color gamuts and spaces to build a neat tool to visualize any of this! Luckily, other people have already done a better job at this than I could probably ever do.
 
 Adam Argyle’s [High Definition CSS Color Guide](https://developer.chrome.com/docs/css-ui/high-definition-css-color-guide#color_interpolation) is the guide when it comes to color spaces and CSS (and is relevant to a lot of what we talk about in this section). I also highly recommend Eric Portis’ _[incredible_ write-up on color spaces](https://ericportis.com/posts/2024/okay-color-spaces/), which delves into a lot more into the science and history of color theory. For an amazing visual tool, Isaac Muse’s interactive [ColorAide color space viewer](https://facelessuser.github.io/coloraide/demos/3d_models.html) is unbeatable. It allows you to map different color gamuts to color spaces (including a ton of spaces not natively available on the web).
 
@@ -318,7 +314,7 @@ On the other hand, we can choose a polar color space (which we access with two l
 >
 ```
 
-We can use the handy tool below to see how a given color interpolation method differs from the one the browser ships with. Note that, as of writing this, Firefox _does not support this new gradient syntax_... this tool does progressively enhance so it should work automatically as soon as Firefox supports gradient interpolation methods ^\_^
+We can use the handy tool below to see how a given color interpolation method differs from the one the browser ships with. Note that, as of writing this, Firefox _does not support this new gradient syntax_... this tool does progressively enhance so it should work automatically as soon as Firefox supports gradient interpolation methods
 
 <!-- <InterpList /> -->
 
@@ -376,8 +372,6 @@ There’s a slight problem, though. This… works… however Tailwind’s direct
 - `bg-gradient-to-t`: where `t` is a property in `gradientDirection` (Our custom)
 
 Because this isn’t visible, Tailwind ends up generating two class definitions for directional gradient classes. Check out the hover preview for one of these directional gradient classes:
-
-<!-- <Media src={duplicate_intellisense_dark} alt="Duplicated intellisense hover previews for the .bg-gradient-to-r class." srcLight={duplicate_intellisense_light} srcDark={duplicate_intellisense_dark} /> -->
 
 This isn’t _technically_ a problem, but DX is always a nice thing, and conflicting CSS rules can be unnecessarily confusing.
 
@@ -1019,8 +1013,6 @@ Besides this being cumbersome, we also end up losing that really nice progressiv
 
 Beyond `linear-gradient()`, there are two other gradient functions that we’ll aim to support. The first is `radial-gradient()`, which specifies a gradient that starts at an origin and “radiates” outwards. We can also use a `conic-gradient()`, which specifies a gradient that interpolates _around_ the circle—kind of like a color wheel.
 
-<!-- <RadialConicDiff /> -->
-
 ### How similar is gradient syntax?
 
 The syntax between all three gradient functions is similar in some ways, and different in others.
@@ -1110,7 +1102,7 @@ The only difference between `<color-stop-list>` and `<angular-color-stop-list>` 
 ></length-percentage>
 ```
 
-Earlier, we found that we can’t easily target arbitrary angle values like to-[45deg], since Tailwind doesn’t expose any angle type to us in the matchUtilities() type option :( We can also dive into the Tailwind source code and see that generating color stops is a pretty complex process…and not one we can really override. With that said, we’ll stick to support <percentage> by default. The good thing with this is that the color stop syntax is—as far as we’re concerned—entirely identical between all three gradient functions:
+Earlier, we found that we can’t easily target arbitrary angle values like to-[45deg], since Tailwind doesn’t expose any angle type to us in the matchUtilities() type option. We can also dive into the Tailwind source code and see that generating color stops is a pretty complex process…and not one we can really override. With that said, we’ll stick to support <percentage> by default. The good thing with this is that the color stop syntax is—as far as we’re concerned—entirely identical between all three gradient functions:
 
 ```html
 <general-color-stop-list>
@@ -1152,8 +1144,6 @@ All three gradient functions have different ways of specifying how they are rend
 - Conic gradients: `[ at <position> ]? [ from <angle> ]?`
 
 Radial and conic gradients both have _two_ optional positioning components. The first one that we’ll work out is the `at <position>` component since its syntax is the same for radial and conic gradients. Later, we’ll implement the other components of this positioning syntax. The syntax for the `<position>` data type can get pretty complex:
-
-<!-- <RadialConicPos /> -->
 
 The syntax for the `<position>` data type can get pretty complex:
 
@@ -1227,7 +1217,7 @@ This data type essentially breaks down into four main cases:
 
 In the first and second cases, the default value for any missing component is `center`. Because of this, the first and second cases both boil down to our two-component syntax, and we don’t need to explicitly handle them :D
 
-For our sanity, we will leave the four-component syntax unsupported. We want to strike a balance between capability and complexity, and registering a bunch of utility classes to handle this relatively rare case is a bit unnecessary. If someone needs the four-component syntax they can always use an arbitrary value ¯\\\_(ツ)\_/¯
+For our sanity, we will leave the four-component syntax unsupported. We want to strike a balance between capability and complexity, and registering a bunch of utility classes to handle this relatively rare case is a bit unnecessary. If someone needs the four-component syntax they can always use an arbitrary value.
 
 We can represent the horizontal and vertical positions of a radial or conic gradient as CSS variables, and default them to `center`. We’ll add these variables to the utility classes we just registered, and then override them elsewhere:
 
@@ -1532,8 +1522,6 @@ The `[ <radial-shape> || <radial-size> ]?` component in the `radial-gradient()` 
 - `closest-corner`: the ending shape’s dimensions are such that the shape—scaled from the gradient’s center—meets the closest corner from the gradient’s center.
 - `farthest-corner`: the ending shape’s dimensions are such that the shape—scaled from the gradient’s center—meets the furthest corner from the gradient’s center.
 
-<!-- <RadialShapeSize /> -->
-
 There are also two other data types we can set the `<radial-size>` to, which depend on whether `<radial-shape>` is a `circle` or `ellipse`:
 
 - if `<radial-shape>` is `circle`: `<radial-size>` may be a single _absolute_ length, like `4rem` or `7px`
@@ -1587,7 +1575,7 @@ export default {
 };
 ```
 
-Then, we’ll register these into a set of dynamic utilities. We also want to respect arbitrary values; however, if we specify the `type` option to restrict our types to lengths and percentages, then we can’t specify more than a single arbitrary value. In other words, a class like `gradient-extent-[5rem]` would work just fine, but `gradient-extent-[5rem_5rem]` wouldn’t. It seems like Tailwind parses the type of the entire passed-in string _before_ it splits the `_` delimiter—and `5rem_5rem` doesn’t fall into any type. Because of this, we’ll leave the `type` option out and lazily parse whatever arbitrary value the user provides ¯\\\_(ツ)\_/¯
+Then, we’ll register these into a set of dynamic utilities. We also want to respect arbitrary values; however, if we specify the `type` option to restrict our types to lengths and percentages, then we can’t specify more than a single arbitrary value. In other words, a class like `gradient-extent-[5rem]` would work just fine, but `gradient-extent-[5rem_5rem]` wouldn’t. It seems like Tailwind parses the type of the entire passed-in string _before_ it splits the `_` delimiter—and `5rem_5rem` doesn’t fall into any type. Because of this, we’ll leave the `type` option out and lazily parse whatever arbitrary value the user provides:
 
 ```jsx
 matchUtilities(
@@ -1619,9 +1607,7 @@ This gives us a nice set of utility classes for controlling the size of a radial
 
 **II. Conic Gradients**
 
-The `[ from <angle> ]?` component allows us to specify the clockwise offset by which the overall gradient is rotated. There really isn’t that much more to it! \\^o^/
-
-<!-- <ConicAngle /> -->
+The `[ from <angle> ]?` component allows us to specify the clockwise offset by which the overall gradient is rotated. There really isn’t that much more to it!
 
 Just as we did with the `conic-gradient()` function, we’ll update our `.bg-gradient-conic` utility class:
 
@@ -1688,5 +1674,3 @@ We learned a bit about color spaces! I mentioned them all already, but do check 
 We dove into W3C syntax, and how to break it down into digestible components that we can work with. I never really found it super necessary to learn this syntax for everything I do on the web, however, it makes perusing through the W3C spec (and oddly entrancing hobby) a bit easier to do!
 
 Of course, we explored how each gradient function differs from one another! Gradients allow us to make beautiful websites and apps, and this teeny Tailwind plugin gives us so much more control to take advantage of color interpolation, gradient positioning, and radial or conic gradients. What’s even better, we gain all of this while maintaining Tailwind’s utility-first fundamentals.
-
-<!-- Tailwind is polarizing, and even I can find it frustrating to work with sometimes. However, it’s undeniable that Tailwind provides one of the most powerful—and extensible—toolkits for modern web styling… after you overcome the learning curve ~(￣▽￣)~* -->
