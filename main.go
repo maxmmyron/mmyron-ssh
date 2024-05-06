@@ -59,7 +59,8 @@ const (
 )
 
 var (
-	glamourRenderer  *glamour.TermRenderer
+	glamourRenderer  *glamour.TermRenderer // current renderer
+	mdRender         string                // existing render
 	posts            []list.Item
 	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#D7D7D7"}).Render
 	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
@@ -179,7 +180,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	m.posts.SetShowHelp(false)
 
 	// FIXME: dont use tea.WithMouseCellMotion() because it seems to break the viewport when scrolling fast
-	return m, []tea.ProgramOption{tea.WithAltScreen()}
+	return m, []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseAllMotion()}
 }
 
 // this function runs in two cases:
@@ -187,7 +188,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 //  2. the best fit width has changed (needsNewFile = false)
 //
 // and handles updating viewport/glamour/list logic
-func Rerender(m model, needsNewFile bool) (model, tea.Cmd) {
+func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.Cmd) {
 	// we've navigated to the posts "page", which *does not* use the viewport for rendering
 	// in this case, we set the viewport to 0x0. This is a hacky way to "clear" the viewport in high performance mode
 	if m.currentPath == "/posts" {
@@ -208,53 +209,56 @@ func Rerender(m model, needsNewFile bool) (model, tea.Cmd) {
 	// navigated away from /posts)
 	m.viewport.Height = m.cmdHeight - headerHeight - footerHeight
 
-	// set up a new renderer
-	renderer, err := glamour.NewTermRenderer(
-		glamour.WithEnvironmentConfig(),
-		glamour.WithWordWrap(m.fitWidth),
-	)
+	if needsNewTerm {
 
-	if err != nil {
-		fmt.Println(err.Error())
-		return m, tea.Quit
-	}
-
-	glamourRenderer = renderer
-
-	// grab a new file if we need to
-	if needsNewFile {
-		file, err := os.ReadFile("fs" + m.currentPath + ".md")
+		// set up a new renderer
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithEnvironmentConfig(),
+			glamour.WithWordWrap(m.fitWidth),
+		)
 
 		if err != nil {
 			fmt.Println(err.Error())
 			return m, tea.Quit
 		}
 
-		md, _ := SplitFrontmatterMarkdown(string(file))
-		m.content = md
+		glamourRenderer = renderer
 
-		// when navigating to a new page, update offset so we don't load a new page scrolled down
-		m.viewport.SetYOffset(0)
-	}
+		// grab a new file if we need to
+		if needsNewFile {
+			file, err := os.ReadFile("fs" + m.currentPath + ".md")
 
-	// render glamour content
-	render, err := glamourRenderer.Render(m.content)
+			if err != nil {
+				fmt.Println(err.Error())
+				return m, tea.Quit
+			}
 
-	if err != nil {
-		fmt.Println(err.Error())
-		return m, tea.Quit
+			md, _ := SplitFrontmatterMarkdown(string(file))
+			m.content = md
+
+			// when navigating to a new page, update offset so we don't load a new page scrolled down
+			m.viewport.SetYOffset(0)
+		}
+
+		// render glamour content
+		mdRender, err = glamourRenderer.Render(m.content)
+
+		if err != nil {
+			fmt.Println(err.Error())
+			return m, tea.Quit
+		}
 	}
 
 	// in high perf mode, View() doesn't seem to render content in *quite* the same way. here, we do some prelim.
 	// rendering by placing the rendered post in a container, and setting the viewport's content to that container
 	// (otherwise, we have no way of centering the content)
 	if useHighPerformanceRenderer {
-		container := lipgloss.Place(m.cmdWidth, m.viewport.Height, lipgloss.Center, lipgloss.Top, render)
+		container := lipgloss.Place(m.cmdWidth, m.viewport.Height, lipgloss.Center, lipgloss.Top, mdRender)
 		m.viewport.SetContent(container)
 		return m, viewport.Sync(m.viewport)
 	}
 
-	m.viewport.SetContent(render)
+	m.viewport.SetContent(mdRender)
 	return m, nil
 }
 
@@ -290,13 +294,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.loaded {
 			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
 			m.loaded = true
-			m, cmd = Rerender(m, true)
+			m, cmd = RerenderContent(m, true, true)
 			cmds = append(cmds, cmd)
 		}
 
 		// request rerender if best fit width has changed
 		if lastFitWidth != m.fitWidth {
-			m, cmd = Rerender(m, false)
+			m, cmd = RerenderContent(m, false, true)
+			cmds = append(cmds, cmd)
+		} else {
+			m, cmd = RerenderContent(m, false, false)
 			cmds = append(cmds, cmd)
 		}
 
@@ -318,7 +325,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// switch to posts page iff we're @ root
 			if m.currentPath == "/root" {
 				m.currentPath = "/posts"
-				m, cmd = Rerender(m, false)
+				m, cmd = RerenderContent(m, false, false)
 				if cmd != nil {
 					cmds = append(cmds, cmd)
 				}
@@ -327,7 +334,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// switch to root page, if we can
 			if m.currentPath != "/root" {
 				m.currentPath = "/root"
-				m, cmd = Rerender(m, true)
+				m, cmd = RerenderContent(m, true, true)
 				if cmd != nil {
 					cmds = append(cmds, cmd)
 				}
@@ -337,7 +344,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.currentPath == "/posts" {
 				newPath := m.posts.SelectedItem().(post).Path()
 				m.currentPath = newPath
-				m, cmd = Rerender(m, true)
+				m, cmd = RerenderContent(m, true, true)
 				if cmd != nil {
 					cmds = append(cmds, cmd)
 				}
