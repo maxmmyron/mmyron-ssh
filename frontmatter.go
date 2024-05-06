@@ -21,8 +21,8 @@ func SplitFrontmatterMarkdown(content string) (string, map[string]interface{}) {
 
 			if strings.HasPrefix(line, "---") {
 				// return end of content and frontmatter if we hit another ---
-				fmt.Println("frontmatter found")
-				return strings.Join(lines[i+1:], "\n"), fm
+				// +2 because first line after last --- is blank
+				return strings.Join(lines[i+2:], "\n"), fm
 			} else if strings.Contains(line, ":") {
 				// otherwise, parse valid line as k/v pair
 				parts := strings.Split(line, ":")
