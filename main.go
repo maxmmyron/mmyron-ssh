@@ -40,11 +40,13 @@ type model struct {
 
 type post struct {
 	title, path, desc string
+	md                string
 }
 
 func (p post) Title() string       { return p.title }
 func (p post) Path() string        { return p.path }
 func (p post) Description() string { return p.desc }
+func (p post) mdContent() string   { return p.md }
 func (p post) FilterValue() string { return p.title }
 
 const (
@@ -58,12 +60,13 @@ const (
 )
 
 var (
-	glamourRenderer *glamour.TermRenderer
-	posts           = []list.Item{
-		post{title: "Post 1", path: "/posts/1", desc: "This is the first post"},
-		post{title: "Post 2", path: "/posts/2", desc: "This is the second post"},
-		post{title: "Post 3", path: "/posts/3", desc: "This is the third post"},
-	}
+	glamourRenderer  *glamour.TermRenderer
+	posts            []list.Item
+	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#D7D7D7"}).Render
+	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
+	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#3F3F3F"}).Render
+	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#F93EFD"}).Render
+	tableBorderColor = lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F3F"}
 )
 
 // loads server
@@ -132,12 +135,50 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 
 	m := model{
 		viewport:    vp,
-		posts:       list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight),
 		fitWidth:    computedWidth,
 		loaded:      false,
 		currentPath: "/root",
 	}
 
+	// grab posts from fs and build out a new list of posts
+	files, err := os.ReadDir("fs/posts")
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		content, err := os.ReadFile("fs/posts/" + file.Name())
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		// split out frontmatter and markdown content, and build out post object to add to list.
+		var post post
+
+		md, fm := SplitFrontmatterMarkdown(string(content))
+
+		post.md = md
+
+		if title, ok := fm["title"]; ok {
+			post.title = title.(string)
+		}
+
+		if desc, ok := fm["subtitle"]; ok {
+			post.desc = desc.(string)
+		}
+
+		post.path = "fs/posts" + file.Name()
+
+		posts = append(posts, post)
+	}
+
+	m.posts = list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight-footerHeight)
 	m.posts.Title = "Recent Posts"
 	m.posts.SetShowHelp(false)
 
@@ -173,7 +214,7 @@ func Rerender(m model, needsNewFile bool) (model, tea.Cmd) {
 
 	// set up a new renderer
 	renderer, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithEnvironmentConfig(),
 		glamour.WithWordWrap(m.fitWidth),
 	)
 
@@ -227,7 +268,6 @@ func (m model) Init() tea.Cmd {
 var lastFitWidth = 0
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	fmt.Println("updating")
 	var (
 		cmd  tea.Cmd
 		cmds []tea.Cmd
@@ -336,13 +376,13 @@ func (m model) View() string {
 
 	// if we're on the posts page, render that as our "inner" content
 	if m.currentPath == "/posts" {
-		listContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(m.posts.Height()).Align(lipgloss.Center, lipgloss.Top).Background(lipgloss.Color("#ff00ff")).SetString(m.posts.View()).Render()
+		listContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(m.posts.Height()).Align(lipgloss.Left, lipgloss.Top).SetString(m.posts.View()).Render()
 		inner = lipgloss.Place(m.cmdWidth, m.posts.Height(), lipgloss.Center, lipgloss.Top, listContainer)
 	}
 
 	combinedVp := lipgloss.JoinVertical(lipgloss.Top, header, inner, footer)
 
-	return lipgloss.NewStyle().Width(m.cmdWidth).Height(m.cmdHeight).Background(lipgloss.Color("#ff0000")).Align(lipgloss.Center, lipgloss.Top).Render(combinedVp)
+	return lipgloss.NewStyle().Width(m.cmdWidth).Height(m.cmdHeight).Align(lipgloss.Center, lipgloss.Top).Render(combinedVp)
 }
 
 func HeaderView(m model) string {
@@ -353,13 +393,13 @@ func HeaderView(m model) string {
 
 	// build out text
 	content := m.currentPath
-	sideContent := fmt.Sprintf("%s %s", "p", "posts")
+	sideContent := fmt.Sprintf("%s %s", ApplyHighlight("p"), ApplySubtle("posts"))
 	if content != "/root" {
-		sideContent = fmt.Sprintf("%s %s", "b", "back")
+		sideContent = fmt.Sprintf("%s %s", ApplyHighlight("b"), ApplySubtle("back"))
 	} else {
 		content = "/"
 	}
-	content = "mmyron.com" + content
+	content = ApplyNormal("mmyron.com" + content)
 
 	// calculate widths for main content
 	mainWidth := m.fitWidth - altLinkWidth
@@ -375,20 +415,20 @@ func HeaderView(m model) string {
 		altStyle  = lipgloss.NewStyle().Width(altLinkWidth).Padding(0, linkPadding).Render
 	)
 
-	t := table.New().BorderColumn(true).Width(m.fitWidth).Border(lipgloss.NormalBorder()) // .BorderStyle(lipgloss.NewStyle().Foreground(tableBorderColor))
+	t := table.New().BorderColumn(true).Width(m.fitWidth).Border(lipgloss.NormalBorder()).BorderStyle(lipgloss.NewStyle().Foreground(tableBorderColor))
 	t.Row(pathStyle(content), altStyle(sideContent))
 
-	return lipgloss.NewStyle().Width(m.cmdWidth).Height(headerHeight).Align(lipgloss.Center, lipgloss.Top).Background(lipgloss.Color("#0000ff")).SetString(t.Render()).Render()
+	return lipgloss.NewStyle().Width(m.cmdWidth).Height(headerHeight).Align(lipgloss.Center, lipgloss.Top).SetString(t.Render()).Render()
 }
 
 func FooterView(m model) string {
 	// ▲/▼ scroll  •  q quit
-	scrollHelp := fmt.Sprintf("%s %s", "▲/▼", "scroll")
-	quitHelp := fmt.Sprintf("%s %s", "q", "quit")
-	help := fmt.Sprintf("%s  %s  %s", scrollHelp, "•", quitHelp)
+	scrollHelp := fmt.Sprintf("%s %s", ApplyHighlight("▲/▼"), ApplySubtle("scroll"))
+	quitHelp := fmt.Sprintf("%s %s", ApplyHighlight("q"), ApplySubtle("quit"))
+	help := fmt.Sprintf("%s  %s  %s", scrollHelp, ApplyMuted("•"), quitHelp)
 
 	helpSection := lipgloss.Place(m.fitWidth, footerHeight-1, lipgloss.Center, lipgloss.Center, help)
-	borderContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(footerHeight-1).Align(lipgloss.Center, lipgloss.Bottom).Border(lipgloss.NormalBorder(), true, false, false).BorderForeground(lipgloss.Color("#00ffff")).SetString(helpSection).Render()
+	borderContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(footerHeight-1).Align(lipgloss.Center, lipgloss.Bottom).Border(lipgloss.NormalBorder(), true, false, false).BorderForeground(tableBorderColor).SetString(helpSection).Render()
 
 	return lipgloss.Place(m.cmdWidth, footerHeight, lipgloss.Center, lipgloss.Bottom, borderContainer)
 }

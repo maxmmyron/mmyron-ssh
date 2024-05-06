@@ -1,3 +1,24 @@
+---
+is_published: true
+
+title: Improving gradients in TailwindCSS
+# optional
+subtitle: A deep dive into how we can improve gradient utility classes in TailwindCSS
+
+# optional
+landing_pitch: An unnecessarily deep dive into improving a teeny subset of TailwindCSS's utility classes.
+
+# optional
+meta_description: Let's learn a bit about gradients, color interpolation, W3C syntax, and the Tailwind plugin API to improve Tailwind's set of gradient utility class!
+
+upload_date: 20 April 2024
+modified_date: 20 April 2024
+reading_time: 40
+
+use_dynamic_og: false
+og_alt: Three different circular gradients overlaid atop of a bunch of TailwindCSS classes. The title of the banner reads 'Improving gradients in TailwindCSS.'
+---
+
 For those unfamiliar, [TailwindCSS](https://tailwindcss.com/) is a CSS framework that allows developers to write using _utility-first classes._ A developer may typically write a card like `<div class="calendar">...</div>`. The `.calendar` class would then have a long list of CSS properties that style the div. With TailwindCSS, that div may look something like:
 
 ```html
