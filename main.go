@@ -46,7 +46,6 @@ type post struct {
 func (p post) Title() string       { return p.title }
 func (p post) Path() string        { return p.path }
 func (p post) Description() string { return p.desc }
-func (p post) mdContent() string   { return p.md }
 func (p post) FilterValue() string { return p.title }
 
 const (
@@ -161,9 +160,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		// split out frontmatter and markdown content, and build out post object to add to list.
 		var post post
 
-		md, fm := SplitFrontmatterMarkdown(string(content))
-
-		post.md = md
+		_, fm := SplitFrontmatterMarkdown(string(content))
 
 		if title, ok := fm["title"]; ok {
 			post.title = title.(string)
@@ -173,8 +170,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 			post.desc = desc.(string)
 		}
 
-		post.path = "fs/posts" + file.Name()
-
+		post.path = "/posts/" + strings.Split(file.Name(), ".")[0]
 		posts = append(posts, post)
 	}
 
@@ -234,7 +230,8 @@ func Rerender(m model, needsNewFile bool) (model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		m.content = string(file)
+		md, _ := SplitFrontmatterMarkdown(string(file))
+		m.content = md
 
 		// when navigating to a new page, update offset so we don't load a new page scrolled down
 		m.viewport.SetYOffset(0)
