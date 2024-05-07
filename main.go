@@ -50,7 +50,7 @@ func (p post) FilterValue() string { return p.title }
 
 const (
 	host                       = "localhost"
-	port                       = "23234"
+	port                       = "35353"
 	maxWidth                   = 80
 	useHighPerformanceRenderer = true
 
