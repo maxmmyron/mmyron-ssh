@@ -33,6 +33,7 @@
   "h3": {
     "prefix": "### ",
     "suffix":"\n",
+    "color": "#8A348B",
     "bold": false
   },
   "h4": {
