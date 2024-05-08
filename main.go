@@ -49,8 +49,8 @@ func (p post) Description() string { return p.desc }
 func (p post) FilterValue() string { return p.title }
 
 const (
-	host                       = "localhost"
-	port                       = "35353"
+	host                       = ""
+	port                       = "23234"
 	maxWidth                   = 80
 	useHighPerformanceRenderer = true
 
@@ -139,6 +139,9 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		loaded:      false,
 		currentPath: "/root",
 	}
+
+	// reset posts
+	posts = []list.Item{}
 
 	// grab posts from fs and build out a new list of posts
 	files, err := os.ReadDir("fs/posts")
