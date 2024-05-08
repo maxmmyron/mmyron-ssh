@@ -364,6 +364,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // renders our model
 func (m model) View() string {
+	if !m.loaded {
+		return ""
+	}
+
 	header := HeaderView(m)
 	footer := FooterView(m)
 
@@ -390,7 +394,11 @@ func HeaderView(m model) string {
 
 	// truncate if necessary
 	if len(content) > mainContentWidth {
-		content = content[:mainContentWidth-4] + "..."
+		if mainContentWidth < 4 {
+			content = "..."
+		} else {
+			content = content[:mainContentWidth-4] + "..."
+		}
 	}
 
 	var (
