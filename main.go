@@ -30,23 +30,12 @@ type model struct {
 	loaded      bool           // whether or not the viewport is loaded
 	viewport    viewport.Model // mostly holds glamour output
 	currentPath string         // current path we're rendering
-	content     string         // currently loaded post
 	fitWidth    int            // best fit content width max 80ch
 	posts       list.Model
 	// terminal dims:
 	cmdWidth  int
 	cmdHeight int
 }
-
-type post struct {
-	title, path, desc string
-	md                string
-}
-
-func (p post) Title() string       { return p.title }
-func (p post) Path() string        { return p.path }
-func (p post) Description() string { return p.desc }
-func (p post) FilterValue() string { return p.title }
 
 const (
 	host                       = ""
@@ -56,17 +45,48 @@ const (
 
 	headerHeight = 4
 	footerHeight = 4
+
+	top = `# hey, i'm max
+
+I study computer science and philosophy at Suffolk University, and design and develop web tools in my spare time. I can't comment on their usefulness, but they're hopefully a little cool.
+
+## Recent Projects`
+
+	prog1 = `### Hypersearch
+
+Hypersearch is a Chromium extension that provides power-user search tools. Slim down and streamline Google search result pages by filtering out spam results and blocking unnecessary info cards.`
+
+	prog2 = `### asciish
+
+Asciish is a Vite/Rollup extension that provides build-time Unicode injection using shortcodes. This helps to keep source code UTF-8 compliant while allowing for the use of complex Unicode characters on a webpage.`
+
+	prog3 = `### escape-time
+
+Escape time is a small WebGL fractal explorer thrown together over a weekend for a Suffolk University Math Society presentation. It supports a few different fractals and was mostly a WebGL learning experience.`
+
+	prog4 = `### Clippy
+
+Clippy.mov is a web-based video editor built using FFmpeg.wasm. I stopped developing it after the new school semester started, and recently came back to it. It's in active development.`
+
+	bot = `## Want to get in touch?
+
+Thanks :D
+
+Feel free to shoot me an email at [max@mmyron.com](mailto:max@mmyron.com).
+`
 )
 
 var (
 	glamourRenderer  *glamour.TermRenderer // current renderer
-	mdRender         string                // existing render
 	posts            []list.Item
 	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#A1A1AA"}).Render
 	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
 	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#3F3F3F"}).Render
 	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#F93EFD"}).Render
 	tableBorderColor = lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F46"}
+
+	render1, render2, render3, render4 string
+	flex                               string
 )
 
 // loads server
@@ -143,44 +163,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	// reset posts
 	posts = []list.Item{}
 
-	// grab posts from fs and build out a new list of posts
-	// files, err := os.ReadDir("fs/posts")
-
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// }
-
-	// for _, file := range files {
-	// 	if file.IsDir() {
-	// 		continue
-	// 	}
-
-	// 	content, err := os.ReadFile("fs/posts/" + file.Name())
-
-	// 	if err != nil {
-	// 		fmt.Println(err.Error())
-	// 	}
-
-	// 	// split out frontmatter and markdown content, and build out post object to add to list.
-	// 	var post post
-
-	// 	_, fm := SplitFrontmatterMarkdown(string(content))
-
-	// 	if title, ok := fm["title"]; ok {
-	// 		post.title = title.(string)
-	// 	}
-
-	// 	if desc, ok := fm["subtitle"]; ok {
-	// 		post.desc = desc.(string)
-	// 	}
-
-	// 	post.path = "/posts/" + strings.Split(file.Name(), ".")[0]
-	// 	posts = append(posts, post)
-	// }
-
 	m.posts = list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight-footerHeight)
-	// m.posts.Title = "Recent Posts"
-	// m.posts.SetShowHelp(false)
 
 	// FIXME: dont use tea.WithMouseCellMotion() because it seems to break the viewport when scrolling fast
 	return m, []tea.ProgramOption{tea.WithMouseCellMotion(), tea.WithAltScreen()}
@@ -194,17 +177,6 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.Cmd) {
 	// we've navigated to the posts "page", which *does not* use the viewport for rendering
 	// in this case, we set the viewport to 0x0. This is a hacky way to "clear" the viewport in high performance mode
-	// if m.currentPath == "/posts" {
-	// 	m.viewport.SetYOffset(0)
-	// 	m.viewport.Width = 0
-	// 	m.viewport.Height = 0
-	// 	m.viewport.SetContent("")
-
-	// 	if useHighPerformanceRenderer {
-	// 		return m, viewport.Sync(m.viewport)
-	// 	}
-	// 	return m, nil
-	// }
 
 	// we've navigated to a new page (not /posts), so we need to update the viewport and glamour renderer.
 
@@ -227,41 +199,57 @@ func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.
 
 		glamourRenderer = renderer
 
-		// grab a new file if we need to
-		if needsNewFile {
-			file, err := os.ReadFile("fs" + m.currentPath + ".md")
+		if m.fitWidth < 70 {
+			render1, _ = renderer.Render(prog1)
+			render2, _ = renderer.Render(prog2)
+			render3, _ = renderer.Render(prog3)
+			render4, _ = renderer.Render(prog4)
+
+			flex = lipgloss.JoinVertical(lipgloss.Left, render1, render2, render3, render4)
+		} else {
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithEnvironmentConfig(),
+				glamour.WithWordWrap(m.fitWidth/2-2),
+			)
 
 			if err != nil {
 				fmt.Println(err.Error())
 				return m, tea.Quit
 			}
 
-			md, _ := SplitFrontmatterMarkdown(string(file))
-			m.content = md
+			render1, _ = renderer.Render(prog1)
+			render2, _ = renderer.Render(prog2)
+			render3, _ = renderer.Render(prog3)
+			render4, _ = renderer.Render(prog4)
 
-			// when navigating to a new page, update offset so we don't load a new page scrolled down
-			m.viewport.SetYOffset(0)
-		}
+			rowAHeight := max(strings.Count(render1, "\n"), strings.Count(render2, "\n")) - 1
+			gapA := lipgloss.NewStyle().Width(2).Height(rowAHeight)
 
-		// render glamour content
-		mdRender, err = glamourRenderer.Render(m.content)
+			rowBHeight := max(strings.Count(render3, "\n"), strings.Count(render4, "\n")) - 1
+			gapB := lipgloss.NewStyle().Width(2).Height(rowBHeight)
 
-		if err != nil {
-			fmt.Println(err.Error())
-			return m, tea.Quit
+			RowA := lipgloss.JoinHorizontal(lipgloss.Left, render1, gapA.Render(), render2)
+			RowB := lipgloss.JoinHorizontal(lipgloss.Left, render3, gapB.Render(), render4)
+
+			flex = lipgloss.JoinVertical(lipgloss.Left, RowA, RowB)
 		}
 	}
+
+	topRender, _ := glamourRenderer.Render(top)
+	botRender, _ := glamourRenderer.Render(bot)
+
+	cmb := lipgloss.JoinVertical(lipgloss.Top, topRender, flex, botRender)
 
 	// in high perf mode, View() doesn't seem to render content in *quite* the same way. here, we do some prelim.
 	// rendering by placing the rendered post in a container, and setting the viewport's content to that container
 	// (otherwise, we have no way of centering the content)
 	if useHighPerformanceRenderer {
-		container := lipgloss.Place(m.cmdWidth, m.viewport.Height, lipgloss.Center, lipgloss.Top, mdRender)
+		container := lipgloss.Place(m.cmdWidth, m.viewport.Height, lipgloss.Center, lipgloss.Top, cmb)
 		m.viewport.SetContent(container)
 		return m, viewport.Sync(m.viewport)
 	}
 
-	m.viewport.SetContent(mdRender)
+	m.viewport.SetContent(cmb)
 	return m, nil
 }
 
@@ -289,9 +277,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.cmdWidth = msg.Width
 		m.cmdHeight = msg.Height
-
-		// m.posts.SetWidth(m.fitWidth)
-		// m.posts.SetHeight(msg.Height - headerHeight - footerHeight)
 
 		// if we haven't loaded the viewport yet, then load root post
 		if !m.loaded {
@@ -323,43 +308,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
-			// FIXME: remove and improve
-		// case "p":
-		// switch to posts page iff we're @ root
-		// if m.currentPath == "/root" {
-		// 	m.currentPath = "/posts"
-		// 	m, cmd = RerenderContent(m, false, false)
-		// 	if cmd != nil {
-		// 		cmds = append(cmds, cmd)
-		// 	}
-		// }
-		// case "b":
-		// 	// switch to root page, if we can
-		// 	if m.currentPath != "/root" {
-		// 		m.currentPath = "/root"
-		// 		m, cmd = RerenderContent(m, true, true)
-		// 		if cmd != nil {
-		// 			cmds = append(cmds, cmd)
-		// 		}
-		// 	}
-		// case "enter":
-		// 	// if on post, load selected post
-		// 	if m.currentPath == "/posts" {
-		// 		newPath := m.posts.SelectedItem().(post).Path()
-		// 		m.currentPath = newPath
-		// 		m, cmd = RerenderContent(m, true, true)
-		// 		if cmd != nil {
-		// 			cmds = append(cmds, cmd)
-		// 		}
-		// 	}
 		default:
 			m.viewport, cmd = m.viewport.Update(msg)
-			// m.posts, cmd = m.posts.Update(msg)
-			// if m.currentPath != "/posts" {
-			// 	m.viewport, cmd = m.viewport.Update(msg)
-			// } else {
-			// 	m.posts, cmd = m.posts.Update(msg)
-			// }
 		}
 	}
 
@@ -402,9 +352,7 @@ func HeaderView(m model) string {
 
 	// build out text
 	content := m.currentPath
-	// sideContent := fmt.Sprintf("%s %s", ApplyHighlight("p"), ApplySubtle("posts"))
 	if content != "/root" {
-		// sideContent = fmt.Sprintf("%s %s", ApplyHighlight("b"), ApplySubtle("back"))
 	} else {
 		content = "/"
 	}
@@ -421,11 +369,9 @@ func HeaderView(m model) string {
 
 	var (
 		pathStyle = lipgloss.NewStyle().Width(mainContentWidth).Padding(0, linkPadding).Render
-		// altStyle  = lipgloss.NewStyle().Width(altLinkWidth).Padding(0, linkPadding).Render
 	)
 
 	t := table.New().BorderColumn(true).Width(m.fitWidth).Border(lipgloss.NormalBorder()).BorderStyle(lipgloss.NewStyle().Foreground(tableBorderColor))
-	// t.Row(pathStyle(content), altStyle(sideContent))
 	t.Row(pathStyle(content))
 
 	return lipgloss.NewStyle().Width(m.cmdWidth).Height(headerHeight).Align(lipgloss.Center, lipgloss.Top).SetString(t.Render()).Render()

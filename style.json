@@ -16,18 +16,21 @@
     "level_indent": 2
   },
   "heading": {
-    "block_suffix": "\n",
+    "block_suffix": "",
     "color": "#B532B8",
     "bold": true
   },
   "h1": {
+    "block_suffix": "\n",
     "prefix": "# "
   },
   "h2": {
+    "block_suffix": "\n",
     "prefix": "\n## "
   },
   "h3": {
     "prefix": "### ",
+    "suffix":"\n",
     "bold": false
   },
   "h4": {
