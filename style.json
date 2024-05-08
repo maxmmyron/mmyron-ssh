@@ -21,12 +21,14 @@
     "bold": true
   },
   "h1": {
-    "block_suffix": "\n",
+    "block_prefix": "\n",
+    "block_suffix": "\n\n",
     "prefix": "# "
   },
   "h2": {
+    "block_prefix": "\n",
     "block_suffix": "\n",
-    "prefix": "\n## "
+    "prefix": "## "
   },
   "h3": {
     "prefix": "### ",

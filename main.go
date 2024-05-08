@@ -79,14 +79,14 @@ Feel free to shoot me an email at [max@mmyron.com](mailto:max@mmyron.com).
 var (
 	glamourRenderer  *glamour.TermRenderer // current renderer
 	posts            []list.Item
-	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#A1A1AA"}).Render
-	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
-	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#3F3F3F"}).Render
-	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#F93EFD"}).Render
-	tableBorderColor = lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F46"}
+	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#27272A", Dark: "#A1A1AA"}).Render
+	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#52525B", Dark: "#71717A"}).Render
+	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#D4D4D8", Dark: "#3F3F46"}).Render
+	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#B824BB", Dark: "#F93EFD"}).Render
+	tableBorderColor = lipgloss.AdaptiveColor{Light: "#D4D4D8", Dark: "#3F3F46"}
 
-	render1, render2, render3, render4 string
-	flex                               string
+	projRender1, projRender2, projRender3, projRender4 string
+	flex                                               string
 )
 
 // loads server
@@ -199,37 +199,46 @@ func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.
 
 		glamourRenderer = renderer
 
-		if m.fitWidth < 70 {
-			render1, _ = renderer.Render(prog1)
-			render2, _ = renderer.Render(prog2)
-			render3, _ = renderer.Render(prog3)
-			render4, _ = renderer.Render(prog4)
-
-			flex = lipgloss.JoinVertical(lipgloss.Left, render1, render2, render3, render4)
-		} else {
-			renderer, err := glamour.NewTermRenderer(
+		if m.fitWidth > 76 {
+			renderer, err = glamour.NewTermRenderer(
 				glamour.WithEnvironmentConfig(),
-				glamour.WithWordWrap(m.fitWidth/2-2),
+				glamour.WithWordWrap(m.fitWidth/2-4),
 			)
 
 			if err != nil {
 				fmt.Println(err.Error())
 				return m, tea.Quit
 			}
+		}
 
-			render1, _ = renderer.Render(prog1)
-			render2, _ = renderer.Render(prog2)
-			render3, _ = renderer.Render(prog3)
-			render4, _ = renderer.Render(prog4)
+		projRender1, _ = renderer.Render(prog1)
+		projRender2, _ = renderer.Render(prog2)
+		projRender3, _ = renderer.Render(prog3)
+		projRender4, _ = renderer.Render(prog4)
 
-			rowAHeight := max(strings.Count(render1, "\n"), strings.Count(render2, "\n")) - 1
-			gapA := lipgloss.NewStyle().Width(2).Height(rowAHeight)
+		projRender1 = strings.TrimSuffix(strings.TrimPrefix(projRender1, "\n"), "\n")
+		projRender2 = strings.TrimSuffix(strings.TrimPrefix(projRender2, "\n"), "\n")
+		projRender3 = strings.TrimSuffix(strings.TrimPrefix(projRender3, "\n"), "\n")
+		projRender4 = strings.TrimSuffix(strings.TrimPrefix(projRender4, "\n"), "\n")
 
-			rowBHeight := max(strings.Count(render3, "\n"), strings.Count(render4, "\n")) - 1
-			gapB := lipgloss.NewStyle().Width(2).Height(rowBHeight)
+		if m.fitWidth < 80 {
+			// remove last newlines
+			projRender4 = strings.TrimSuffix(projRender4, "\n")
 
-			RowA := lipgloss.JoinHorizontal(lipgloss.Left, render1, gapA.Render(), render2)
-			RowB := lipgloss.JoinHorizontal(lipgloss.Left, render3, gapB.Render(), render4)
+			flex = lipgloss.JoinVertical(lipgloss.Left, projRender1, projRender2, projRender3, projRender4)
+		} else {
+			// remove last newlines
+			projRender3 = strings.TrimSuffix(projRender2, "\n")
+			projRender4 = strings.TrimSuffix(projRender4, "\n")
+
+			rowAHeight := max(strings.Count(projRender1, "\n"), strings.Count(projRender2, "\n"))
+			gapA := lipgloss.NewStyle().Width(4).Height(rowAHeight)
+
+			rowBHeight := max(strings.Count(projRender3, "\n"), strings.Count(projRender4, "\n"))
+			gapB := lipgloss.NewStyle().Width(4).Height(rowBHeight)
+
+			RowA := lipgloss.JoinHorizontal(lipgloss.Left, projRender1, gapA.Render(), projRender2)
+			RowB := lipgloss.JoinHorizontal(lipgloss.Left, projRender3, gapB.Render(), projRender4)
 
 			flex = lipgloss.JoinVertical(lipgloss.Left, RowA, RowB)
 		}
@@ -269,6 +278,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		lastFitWidth = m.fitWidth
 		m.fitWidth = min(msg.Width, maxWidth)
+		if m.fitWidth < 80 {
+			m.fitWidth = m.fitWidth - 4
+		}
 
 		// if we're not on the posts page, then update the viewport height
 		if m.currentPath != "/posts" {
@@ -346,7 +358,7 @@ func (m model) View() string {
 
 func HeaderView(m model) string {
 	const (
-		altLinkWidth = 11
+		altLinkWidth = 0
 		linkPadding  = 2
 	)
 
@@ -379,8 +391,8 @@ func HeaderView(m model) string {
 
 func FooterView(m model) string {
 	// ▲/▼ scroll  •  q quit
-	scrollHelp := fmt.Sprintf("%s %s", ApplyHighlight("▲/▼"), ApplySubtle("scroll"))
-	quitHelp := fmt.Sprintf("%s %s", ApplyHighlight("q"), ApplySubtle("quit"))
+	scrollHelp := fmt.Sprintf("%s %s", ApplyNormal("↑ /↓"), ApplySubtle("scroll"))
+	quitHelp := fmt.Sprintf("%s %s", ApplyNormal("q"), ApplySubtle("quit"))
 	help := fmt.Sprintf("%s  %s  %s", scrollHelp, ApplyMuted("•"), quitHelp)
 
 	helpSection := lipgloss.Place(m.fitWidth, footerHeight-1, lipgloss.Center, lipgloss.Center, help)
