@@ -30,14 +30,12 @@ Each of those classes usually represents a _single_ CSS property. `bg-zinc-100`,
 Tailwind is definitely polarizing. We don’t need to swap between HTML and CSS files, however, it’s easy to fill elements with a ridiculous number of classes. Like, One of the elements on this blog literally looks like this:
 
 ```html
-<main
-  class="max-w-none w-full px-5 4k:px-16 prose prose-zinc dark:prose-invert
-      prose-code:before:content-none prose-code:after:content-none
-      dark:prose-h1:text-zinc-200 dark:prose-h2:text-zinc-300 dark:prose-h3:text-zinc-300 dark:prose-p:text-zinc-300 prose-a:text-inherit dark:prose-a:text-zinc-200
-      prose-h2:mt-8 prose-h2:mb-6 last-of-type:prose-p:mb-0 prose-ul:mb-3 prose-ol:mb-3
-      first-of-type:prose-th:rounded-l-md last-of-type:prose-th:rounded-r-md
-      prose-th:py-2 has-[th]:prose-tr:bg-zinc-100 dark:has-[th]:prose-tr:bg-zinc-900 prose-thead:sticky prose-thead:top-0"
->
+<main class="max-w-none w-full px-5 4k:px-16 prose prose-zinc dark:prose-invert
+  prose-code:before:content-none prose-code:after:content-none
+  dark:prose-h1:text-zinc-200 dark:prose-h2:text-zinc-300 dark:prose-h3:text-zinc-300 dark:prose-p:text-zinc-300 prose-a:text-inherit dark:prose-a:text-zinc-200
+  prose-h2:mt-8 prose-h2:mb-6 last-of-type:prose-p:mb-0 prose-ul:mb-3 prose-ol:mb-3
+  first-of-type:prose-th:rounded-l-md last-of-type:prose-th:rounded-r-md
+  prose-th:py-2 has-[th]:prose-tr:bg-zinc-100 dark:has-[th]:prose-tr:bg-zinc-900 prose-thead:sticky prose-thead:top-0">
   <!-- ... -->
 </main>
 ```
@@ -68,12 +66,11 @@ Currently, Tailwind CSS supports a pretty limited number of solutions when it co
 A Tailwind gradient assumes the `from-*`, `via-*`, and `to-*` stop colors to be `transparent`, so we only _need_ to define one color stop. Defining a gradient in Tailwind utility classes can be as complex as:
 
 ```html
-<div
-  class="bg-gradient-to-<direction>
-			from-<color> from-<percentage>
-			via-<color> via-<percentage>
-			to-<color> to-<percentage>"
-></div>
+<div class="bg-gradient-to-<direction>
+  from-<color> from-<percentage>
+  via-<color> via-<percentage>
+  to-<color> to-<percentage>">
+</div>
 ```
 
 However, this misses out on a lot of functionality. Let’s take a peek at how the `linear-gradient()` function is defined.
@@ -85,9 +82,7 @@ The [W3C](https://www.w3.org/) is the body that writes the **standards** for the
 When it comes to CSS, the W3C has a standard way of writing **syntax**. Syntax tells us how things in CSS can be written validly. For example, the syntax of the `<color>` type is:
 
 ```html
-<color>
-  = <color-base> | currentColor | <system-color></system-color></color-base
-></color>
+<color> = <color-base> | currentColor | <system-color>
 ```
 
 The bar (`|`) combinator tells us that a valid color can be either `<color-base>` _or_ `currentColor` _or_ a `<system-color>`. A valid `<color>` could be `hsl(35deg 100% 50%)` because that’s a valid `<color-base>`, but values like `#a`, `woofdog`, or `superDeepPurple` are _not_ valid.
@@ -95,25 +90,15 @@ The bar (`|`) combinator tells us that a valid color can be either `<color-base>
 The `<linear-gradient()>` type tells us how we can write a valid `linear-gradient()` function:
 
 ```html
-<linear-gradient()>
-  = linear-gradient(
-  <linear-gradient-syntax> )</linear-gradient-syntax></linear-gradient()
->
+<linear-gradient()> = linear-gradient( <linear-gradient-syntax> )
 ```
 
 And the `<linear-gradient-syntax>` type tells us the valid arrangement of the `linear-gradient()` arguments:
 
 ```html
-<linear-gradient-syntax>
-  = [ [
-  <angle>
-    | to
-    <side-or-corner>
-      ] ||
-      <color-interpolation-method>
-        ]?,
-        <color-stop-list></color-stop-list></color-interpolation-method></side-or-corner></angle
-></linear-gradient-syntax>
+<linear-gradient-syntax> =
+  [ [ <angle> | to <side-or-corner> ] || <color-interpolation-method> ]?,
+  <color-stop-list>
 ```
 
 Looks a bit complex! We can break this down piece by piece though. We can first note the **grouping brackets** (`[ ]`) that surround the first chunk, followed by the **question mark** (`?`). This tells us that everything inside the brackets (`[ <angle> | to <side-or-corner> ] || <color-interpolation-method>`) is optional.
@@ -121,19 +106,13 @@ Looks a bit complex! We can break this down piece by piece though. We can first 
 Inside these first set of brackets we have the following:
 
 ```html
-[
-<angle>
-  | to
-  <side-or-corner>
-    ] ||
-    <color-interpolation-method></color-interpolation-method></side-or-corner
-></angle>
+[ <angle> | to <side-or-corner> ] || <color-interpolation-method>
 ```
 
 The **double bar** (`||`) tells us that we can have _one or more_ of the options on either side of it. We can think of it as the `option` combinator: we can pick multiple components if we want and add them into the mix. We can include just one portion of this syntax, like `[ <angle> | to <side-or-corner> ]` or `<color-interpolation-method>`, but we can also include the whole thing. An example `linear-gradient()` function might be:
 
 ```css
-linear-gradient(35deg in oklab, /* ... */);
+background: linear-gradient(35deg in oklab, /* ... */);
 ```
 
 The `35deg` satisfies the `[ <angle> | to <side-or-corner> ]` syntax, and the `in oklab` satisfies the `<color-interpolation-method>` syntax.
@@ -154,15 +133,7 @@ Ultimately, there are a few general components to focus on:
 3. The **color stops** (`<color-stop-list>`): This is a list of colors and percentages, which defines the colors the gradient interpolates between, and over what portion of the gradient we interpolate between two colors. The `<color-stop-list>` syntax is defined as:
 
    ```html
-   <color-stop-list>
-     =
-     <linear-color-stop>
-       , [
-       <linear-color-hint
-         >? , <linear-color-stop> ]#</linear-color-stop></linear-color-hint
-       ></linear-color-stop
-     ></color-stop-list
-   >
+   <color-stop-list> = <linear-color-stop>, [ <linear-color-hint>? , <linear-color-stop> ]#
    ```
 
    We won’t dive too deep into this, but in general, this syntax allows us to define as many color stops as we want. The `<linear-color-stop>` type allows us to specify a color and up to two `<length-percentage>` types (these are either a length, like `50px`, or a percentage, like `10%`). These two `<length-percentage>` types specify the start and end of where the specified color is _solid_ (i.e. where it doesn’t change at all).
@@ -239,7 +210,7 @@ With this improvement, we automatically gain a bunch of new utility classes for 
 
 ```json
 export default {
-	theme: {
+  theme: {
 		extend: {
 			rotate: {
 				77: "77deg",
@@ -264,8 +235,6 @@ export default {
 
 Just for completeness, here’s the full list of the linear gradient angle utility classes and their generated class properties:
 
-<div class="max-h-[80vh] overflow-auto border border-zinc-200 dark:border-zinc-800 my-4 rounded-md">
-
 | Tailwind class       | Generated declarations                                                 |
 | -------------------- | ---------------------------------------------------------------------- |
 | `bg-gradient-to-0`   | `background-image: linear-gradient(0deg, var(--tw-gradient-stops));`   |
@@ -277,8 +246,6 @@ Just for completeness, here’s the full list of the linear gradient angle utili
 | `bg-gradient-to-45`  | `background-image: linear-gradient(45deg, var(--tw-gradient-stops));`  |
 | `bg-gradient-to-90`  | `background-image: linear-gradient(90deg, var(--tw-gradient-stops));`  |
 | `bg-gradient-to-180` | `background-image: linear-gradient(180deg, var(--tw-gradient-stops));` |
-
-</div>
 
 ## Implementing color space interpolation
 
@@ -305,21 +272,13 @@ Adam Argyle’s [High Definition CSS Color Guide](https://developer.chrome.com/d
 The syntax of `<color-interpolation-method>` is:
 
 ```html
-in [
-<rectangular-color-space>
-  |
-  <polar-color-space>
-    <hue-interpolation-method>? ]</hue-interpolation-method></polar-color-space
-  ></rectangular-color-space
->
+in [ <rectangular-color-space> | <polar-color-space> <hue-interpolation-method>? ]
 ```
 
 We have two options here. On one hand, we can choose a rectangular color space (which we access with three linear axes):
 
 ```html
-<rectangular-color-space>
-  = srgb | srgb-linear | lab | oklab | xyz</rectangular-color-space
->
+<rectangular-color-space> = srgb | srgb-linear | lab | oklab | xyz
 ```
 
 On the other hand, we can choose a polar color space (which we access with two linear axes and a “rotation”). If we choose a polar color space to interpolate our gradient with, we can optionally choose a hue interpolation method, which tells us how we want to rotate around the color space to interpolate from one color to another.
@@ -327,11 +286,8 @@ On the other hand, we can choose a polar color space (which we access with two l
 <!-- <PolarHueInterp/> -->
 
 ```html
-<polar-color-space>
-  = hsl | hwb | lch | oklch
-  <hue-interpolation-method>
-    = [shorter | longer | increasing | decreasing] hue</hue-interpolation-method
-  ></polar-color-space
+<polar-color-space> = hsl | hwb | lch | oklch
+<hue-interpolation-method> = [shorter | longer | increasing | decreasing] hue
 >
 ```
 
@@ -576,9 +532,8 @@ Any given polar color space can _optionally_ have one of four interpolation meth
 Like, there really isn’t a need for an entire set of utility classes just for hue interpolation methods:
 
 ```html
-<div
-  class="bg-gradient-to-330 bg-interpolate-oklch bg-interpolate-hue-longer"
-></div>
+<div class="bg-gradient-to-330 bg-interpolate-oklch bg-interpolate-hue-longer">
+</div>
 ```
 
 When instead, we can just specify the method right in our color space utility class with the `/` modifier`:`
@@ -609,29 +564,23 @@ With this, we have a really nice expanded set of classes we can use to better co
 
 ```html
 <!-- rectangular color space interpolation -->
-<div
-  class="bg-gradient-to-r bg-interpolate-oklab from-red-500 to-blue-500"
-></div>
+<div class="bg-gradient-to-r bg-interpolate-oklab from-red-500 to-blue-500">
+</div>
 
 <!-- cylindrical color space interpolation -->
 <!-- this is visually equivalent to using the "shorter hue" <hue-interpolation-method> -->
-<div
-  class="bg-gradient-to-[50deg] bg-interpolate-hwb from-red-500 to-blue-500"
-></div>
+<div class="bg-gradient-to-[50deg] bg-interpolate-hwb from-red-500 to-blue-500">
+</div>
 
 <!-- cylindrical color space interpolation: with <hue-interpolation-method> -->
-<div
-  class="bg-gradient-to-[27deg] bg-interpolate-hwb/longer from-red-500 to-blue-500"
-></div>
-<div
-  class="bg-gradient-to-12 bg-interpolate-hwb/shorter from-red-500 to-blue-500"
-></div>
-<div
-  class="bg-gradient-to-bl bg-interpolate-oklch/increasing from-red-500 to-blue-500"
-></div>
-<div
-  class="bg-gradient-to-r bg-interpolate-oklch/decreasing from-red-500 to-blue-500"
-></div>
+<div class="bg-gradient-to-[27deg] bg-interpolate-hwb/longer from-red-500 to-blue-500">
+</div>
+<div class="bg-gradient-to-12 bg-interpolate-hwb/shorter from-red-500 to-blue-500">
+</div>
+<div class="bg-gradient-to-bl bg-interpolate-oklch/increasing from-red-500 to-blue-500">
+</div>
+<div class="bg-gradient-to-r bg-interpolate-oklch/decreasing from-red-500 to-blue-500">
+</div>
 ```
 
 ### Adding browser fallbacks
@@ -696,7 +645,9 @@ for (const space of polarSpaces) {
 
 And, hey! That’s actually all there is to it! With that, we have a really robust set of utility classes that allow us to specify the color interpolation method for our gradients. The best part is that these progressively enhance, so browsers that don’t currently support the new gradient syntax will automatically support these utility classes when they gain support—no library update required!
 
-<div class="max-h-[80vh] overflow-auto border border-zinc-200 dark:border-zinc-800 my-4 rounded-md">
+*(NOTE: the SSH version of this post can't properly display this utility class list... yet.)*
+
+<!-- <div class="max-h-[80vh] overflow-auto border border-zinc-200 dark:border-zinc-800 my-4 rounded-md">
 <table style="table-layout: fixed;">
   <caption class="py-3 italic bg-zinc-100 dark:bg-zinc-900">Implemented color interpolation method utility classes and generated CSS properties</caption>
   <colgroup>
@@ -711,7 +662,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
   </thead>
 
   <tbody>
-    <!-- Default class -->
     <tr>
       <td>
 
@@ -730,7 +680,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
     <th colspan="2">Rectangular color interpolation methods</th>
   </tr>
 
-  <!-- srgb -->
   <tr>
     <td>
 
@@ -751,7 +700,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- srgb-linear -->
   <tr>
     <td>
 
@@ -772,7 +720,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- lab -->
   <tr>
     <td>
 
@@ -793,7 +740,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- oklab -->
   <tr>
     <td>
 
@@ -814,7 +760,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- xyz -->
   <tr>
     <td>
 
@@ -839,7 +784,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
     <th colspan="2">Polar color interpolation methods</th>
   </tr>
 
-  <!-- hsl -->
   <tr>
     <td>
 
@@ -880,7 +824,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- hwb -->
   <tr>
     <td>
 
@@ -921,7 +864,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- lch -->
   <tr>
     <td>
 
@@ -962,7 +904,6 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
 
   </tr>
 
-  <!-- oklch -->
   <tr>
     <td>
 
@@ -1004,16 +945,15 @@ And, hey! That’s actually all there is to it! With that, we have a really robu
   </tr>
   </tbody>
 </table>
-</div>
+</div> -->
 
 ## Supporting other gradient functions
 
 With our improvements, we’ve implemented essentially every feature available to us in a linear-gradient() function. These improvements give us granular control when it comes to defining linear gradients… but what about other gradients? If we want to support a conic gradient, for example, we need to either use square bracket notation for an arbitrary property…
 
 ```html
-<div
-  class="[background-image:conic-gradient(in_oklab,theme(colors.red.500),theme(colors.blue.500))]"
-></div>
+<div class="[background-image:conic-gradient(in_oklab,theme(colors.red.500),theme(colors.blue.500))]">
+</div>
 ```
 
 …or, we need to add a custom utility:
@@ -1039,103 +979,35 @@ Beyond `linear-gradient()`, there are two other gradient functions that we’ll 
 The syntax between all three gradient functions is similar in some ways, and different in others.
 
 ```html
-<linear-gradient-syntax>
-  = [ [
-  <angle>
-    | to
-    <side-or-corner>
-      ] ||
-      <color-interpolation-method>
-        ]?,
-        <color-stop-list>
-          <radial-gradient-syntax>
-            = [ [ [
-            <radial-shape>
-              ||
-              <radial-size>
-                ]? [ at
-                <position>
-                  ]? ] ||
-                  <color-interpolation-method
-                    >]? ,
-                    <color-stop-list>
-                      <conic-gradient-syntax>
-                        = [ [ [ from
-                        <angle>
-                          ]? [ at
-                          <position>
-                            ]? ] ||
-                            <color-interpolation-method>
-                              ]? ,
-                              <angular-color-stop-list></angular-color-stop-list></color-interpolation-method></position></angle></conic-gradient-syntax></color-stop-list></color-interpolation-method></position></radial-size></radial-shape></radial-gradient-syntax></color-stop-list></color-interpolation-method></side-or-corner></angle
-></linear-gradient-syntax>
+<linear-gradient-syntax> = [ [ <angle> | to <side-or-corner> ] || <color-interpolation-method> ]?, <color-stop-list>
+
+<radial-gradient-syntax> = [ [ [ <radial-shape> || <radial-size> ]? [ at <position> ]? ] || <color-interpolation-method>]?, <color-stop-list>
+
+<conic-gradient-syntax> = [ [ [ from <angle> ]? [ at <position> ]? ] || <color-interpolation-method>]?, <angular-color-stop-list>
 ```
 
 Linear and radial gradients use the same `<color-stop-list>` data type, while conic gradients use a special `<angular-color-stop-list>`. This seems like it might be a problem since it would be a huge pain to have to redefine _every_ color stop utility for conic gradients. However, by expanding these data types, we can see just how similar they really are:
 
 ```html
 <!-- linear color stop list: used in linear and radial gradients -->
-<color-stop-list>
-  =
-  <color>
-    <length-percentage
-      >{1,2}, [<length-percentage
-        >?,
-        <color>
-          <length-percentage
-            >{1,2} ]#
+<color-stop-list> = <color> <length-percentage>{1,2}, [<length-percentage>?, <color> <length-percentage>{1,2} ]#
 
-            <!-- angular color stop list: used in conic gradients -->
-            <angular-color-stop-list>
-              =
-              <color>
-                <angle-percentage
-                  >{1,2}, [<angle-percentage
-                    >?,
-                    <color>
-                      <angle-percentage>{1,2} ]#</angle-percentage></color
-                    ></angle-percentage
-                  ></angle-percentage
-                ></color
-              ></angular-color-stop-list
-            ></length-percentage
-          ></color
-        ></length-percentage
-      ></length-percentage
-    ></color
-  ></color-stop-list
->
+<!-- angular color stop list: used in conic gradients -->
+<angular-color-stop-list> = <color> <angle-percentage>{1,2}, [<angle-percentage>?, <color> <angle-percentage>{1,2} ]#
 ```
 
 The only difference between `<color-stop-list>` and `<angular-color-stop-list>` is in the data type we use to determine where to place a color stop. `<color-stop-list>` uses the `<length-percentage>` data type, and `<angular-color-stop-list>` uses the `<angle-percentage>` data type:
 
 ```html
-<length-percentage>
-  =
-  <length>
-    |
-    <percentage>
-      <angle-percentage>
-        =
-        <angle>
-          |
-          <percentage></percentage></angle></angle-percentage></percentage></length
-></length-percentage>
+<length-percentage> = <length> | <percentage>
+
+<angle-percentage> = <angle> | <percentage>
 ```
 
 Earlier, we found that we can’t easily target arbitrary angle values like to-[45deg], since Tailwind doesn’t expose any angle type to us in the matchUtilities() type option. We can also dive into the Tailwind source code and see that generating color stops is a pretty complex process…and not one we can really override. With that said, we’ll stick to support <percentage> by default. The good thing with this is that the color stop syntax is—as far as we’re concerned—entirely identical between all three gradient functions:
 
 ```html
-<general-color-stop-list>
-  =
-  <color>
-    <percentage
-      >{1,2}, [<percentage
-        >?, <color> <percentage>{1,2} ]#</percentage></color></percentage
-      ></percentage
-    ></color
-  ></general-color-stop-list
->
+<general-color-stop-list> = <color> <percentage>{1,2}, [<percentage>?, <color> <percentage>{1,2} ]#
 ```
 
 In other words, this isn’t something we need to worry about! We can use the same `--tw-gradient-stops` variable to specify our color stops.
@@ -1169,28 +1041,14 @@ Radial and conic gradients both have _two_ optional positioning components. The 
 The syntax for the `<position>` data type can get pretty complex:
 
 ```html
-[ at
-<position>
-  ]?
+[ at <position> ]?
 
-  <position>
-    = [ [ left | center | right | top | bottom |
-    <length-percentage>
-      ] | [ left | center | right ] && [ top | center | bottom ] | [ left |
-      center | right |
-      <length-percentage>
-        ] [ top | center | bottom |
-        <length-percentage>
-          ] | [ [ left | right ]
-          <length-percentage>
-            ] && [ [ top | bottom ]
-            <length-percentage> ] ]</length-percentage></length-percentage
-          ></length-percentage
-        ></length-percentage
-      ></length-percentage
-    ></position
-  ></position
->
+<position> = [
+  [ left | center | right | top | bottom | <length-percentage> ] |
+  [ left | center | right ] && [ top | center | bottom ] |
+  [ left | center | right |<length-percentage> ] [ top | center | bottom | <length-percentage> ] |
+  [ [ left | right ] <length-percentage> ] && [ [ top | bottom ] <length-percentage> ]
+]
 ```
 
 This data type essentially breaks down into four main cases:
@@ -1421,8 +1279,6 @@ If the class is instead something like `bg-gradient-pos-[20px_40px]`, then the p
 
 With that, we have an extensive set of utilities to let us position both radial and conic gradients pretty much anywhere.
 
-<div class="max-h-[80vh] overflow-auto border border-zinc-200 dark:border-zinc-800 my-4 rounded-md">
-
 | Tailwind class            | Generated declarations                                                             |
 | ------------------------- | ---------------------------------------------------------------------------------- |
 | `bg-gradient-pos-t`       | `--tw-gradient-x-position: center;`<br>`--tw-gradient-y-position: top;`            |
@@ -1519,8 +1375,6 @@ With that, we have an extensive set of utilities to let us position both radial 
 | `bg-gradient-pos-y-11/12` | `--tw-gradient-y-position: 91.66667%;`                                             |
 | `bg-gradient-pos-y-full`  | `--tw-gradient-y-position: 100%;`                                                  |
 
-</div>
-
 ### Implementing other gradient arguments: `radial-gradient()` ending shape and `conic-gradient()` rotation angle
 
 We’re almost done! All we need to do now is handle the unique syntax components in the radial and conic gradient functions.
@@ -1615,16 +1469,12 @@ matchUtilities(
 
 This gives us a nice set of utility classes for controlling the size of a radial gradient.
 
-<div class="max-h-[80vh] overflow-auto border border-zinc-200 dark:border-zinc-800 my-4 rounded-md">
-
 | Tailwind class                  | Generated declarations             |
 | ------------------------------- | ---------------------------------- |
 | gradient-extent-closest-side    | --tw-radial-size: closest-side;    |
 | gradient-extent-farthest-side   | --tw-radial-size: farthest-side;   |
 | gradient-extent-closest-corner  | --tw-radial-size: closest-corner;  |
 | gradient-extent-farthest-corner | --tw-radial-size: farthest-corner; |
-
-</div>
 
 **II. Conic Gradients**
 
@@ -1664,8 +1514,6 @@ matchUtilities(
 
 Phew! That was easy. We now have a set of utility classes to handle conic gradient offset angles:
 
-<div class="max-h-[80vh] overflow-auto border border-zinc-200 dark:border-zinc-800 my-4 rounded-md">
-
 | Tailwind class       | Generated declarations    |
 | -------------------- | ------------------------- |
 | conic-grad-angle-0   | --tw-conic-angle: 0deg;   |
@@ -1677,8 +1525,6 @@ Phew! That was easy. We now have a set of utility classes to handle conic gradie
 | conic-grad-angle-45  | --tw-conic-angle: 45deg;  |
 | conic-grad-angle-90  | --tw-conic-angle: 90deg;  |
 | conic-grad-angle-180 | --tw-conic-angle: 180deg; |
-
-</div>
 
 <!-- --- -->
 

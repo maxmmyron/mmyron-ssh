@@ -19,3 +19,9 @@ Escape time is a small WebGL fractal explorer thrown together over a weekend for
 ### Clippy
 
 Clippy.mov is a web-based video editor built using FFmpeg.wasm. I stopped developing it after the new school semester started, and recently came back to it. It's in active development.
+
+## Want to get in touch?
+
+Thanks :D
+
+Feel free to shoot me an email at [max@mmyron.com](mailto:max@mmyron.com).

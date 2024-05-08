@@ -50,7 +50,7 @@ func (p post) FilterValue() string { return p.title }
 
 const (
 	host                       = ""
-	port                       = "23234"
+	port                       = "22"
 	maxWidth                   = 80
 	useHighPerformanceRenderer = true
 
@@ -62,11 +62,11 @@ var (
 	glamourRenderer  *glamour.TermRenderer // current renderer
 	mdRender         string                // existing render
 	posts            []list.Item
-	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#D7D7D7"}).Render
+	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#A1A1AA"}).Render
 	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#7C7C7C"}).Render
 	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666", Dark: "#3F3F3F"}).Render
 	ApplyHighlight   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000", Dark: "#F93EFD"}).Render
-	tableBorderColor = lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F3F"}
+	tableBorderColor = lipgloss.AdaptiveColor{Light: "#cccccc", Dark: "#3F3F46"}
 )
 
 // loads server
@@ -144,46 +144,46 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	posts = []list.Item{}
 
 	// grab posts from fs and build out a new list of posts
-	files, err := os.ReadDir("fs/posts")
+	// files, err := os.ReadDir("fs/posts")
 
-	if err != nil {
-		fmt.Println(err.Error())
-	}
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
 
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
+	// for _, file := range files {
+	// 	if file.IsDir() {
+	// 		continue
+	// 	}
 
-		content, err := os.ReadFile("fs/posts/" + file.Name())
+	// 	content, err := os.ReadFile("fs/posts/" + file.Name())
 
-		if err != nil {
-			fmt.Println(err.Error())
-		}
+	// 	if err != nil {
+	// 		fmt.Println(err.Error())
+	// 	}
 
-		// split out frontmatter and markdown content, and build out post object to add to list.
-		var post post
+	// 	// split out frontmatter and markdown content, and build out post object to add to list.
+	// 	var post post
 
-		_, fm := SplitFrontmatterMarkdown(string(content))
+	// 	_, fm := SplitFrontmatterMarkdown(string(content))
 
-		if title, ok := fm["title"]; ok {
-			post.title = title.(string)
-		}
+	// 	if title, ok := fm["title"]; ok {
+	// 		post.title = title.(string)
+	// 	}
 
-		if desc, ok := fm["subtitle"]; ok {
-			post.desc = desc.(string)
-		}
+	// 	if desc, ok := fm["subtitle"]; ok {
+	// 		post.desc = desc.(string)
+	// 	}
 
-		post.path = "/posts/" + strings.Split(file.Name(), ".")[0]
-		posts = append(posts, post)
-	}
+	// 	post.path = "/posts/" + strings.Split(file.Name(), ".")[0]
+	// 	posts = append(posts, post)
+	// }
 
 	m.posts = list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight-footerHeight)
-	m.posts.Title = "Recent Posts"
-	m.posts.SetShowHelp(false)
+	// m.posts.Title = "Recent Posts"
+	// m.posts.SetShowHelp(false)
 
 	// FIXME: dont use tea.WithMouseCellMotion() because it seems to break the viewport when scrolling fast
-	return m, []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseAllMotion()}
+	return m, []tea.ProgramOption{tea.WithMouseCellMotion(), tea.WithAltScreen()}
 }
 
 // this function runs in two cases:
@@ -194,17 +194,17 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.Cmd) {
 	// we've navigated to the posts "page", which *does not* use the viewport for rendering
 	// in this case, we set the viewport to 0x0. This is a hacky way to "clear" the viewport in high performance mode
-	if m.currentPath == "/posts" {
-		m.viewport.SetYOffset(0)
-		m.viewport.Width = 0
-		m.viewport.Height = 0
-		m.viewport.SetContent("")
+	// if m.currentPath == "/posts" {
+	// 	m.viewport.SetYOffset(0)
+	// 	m.viewport.Width = 0
+	// 	m.viewport.Height = 0
+	// 	m.viewport.SetContent("")
 
-		if useHighPerformanceRenderer {
-			return m, viewport.Sync(m.viewport)
-		}
-		return m, nil
-	}
+	// 	if useHighPerformanceRenderer {
+	// 		return m, viewport.Sync(m.viewport)
+	// 	}
+	// 	return m, nil
+	// }
 
 	// we've navigated to a new page (not /posts), so we need to update the viewport and glamour renderer.
 
@@ -290,8 +290,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cmdWidth = msg.Width
 		m.cmdHeight = msg.Height
 
-		m.posts.SetWidth(m.fitWidth)
-		m.posts.SetHeight(msg.Height - headerHeight - footerHeight)
+		// m.posts.SetWidth(m.fitWidth)
+		// m.posts.SetHeight(msg.Height - headerHeight - footerHeight)
 
 		// if we haven't loaded the viewport yet, then load root post
 		if !m.loaded {
@@ -321,43 +321,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q":
+		case "q", "ctrl+c":
 			return m, tea.Quit
 			// FIXME: remove and improve
-		case "p":
-			// switch to posts page iff we're @ root
-			if m.currentPath == "/root" {
-				m.currentPath = "/posts"
-				m, cmd = RerenderContent(m, false, false)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-		case "b":
-			// switch to root page, if we can
-			if m.currentPath != "/root" {
-				m.currentPath = "/root"
-				m, cmd = RerenderContent(m, true, true)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-		case "enter":
-			// if on post, load selected post
-			if m.currentPath == "/posts" {
-				newPath := m.posts.SelectedItem().(post).Path()
-				m.currentPath = newPath
-				m, cmd = RerenderContent(m, true, true)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
+		// case "p":
+		// switch to posts page iff we're @ root
+		// if m.currentPath == "/root" {
+		// 	m.currentPath = "/posts"
+		// 	m, cmd = RerenderContent(m, false, false)
+		// 	if cmd != nil {
+		// 		cmds = append(cmds, cmd)
+		// 	}
+		// }
+		// case "b":
+		// 	// switch to root page, if we can
+		// 	if m.currentPath != "/root" {
+		// 		m.currentPath = "/root"
+		// 		m, cmd = RerenderContent(m, true, true)
+		// 		if cmd != nil {
+		// 			cmds = append(cmds, cmd)
+		// 		}
+		// 	}
+		// case "enter":
+		// 	// if on post, load selected post
+		// 	if m.currentPath == "/posts" {
+		// 		newPath := m.posts.SelectedItem().(post).Path()
+		// 		m.currentPath = newPath
+		// 		m, cmd = RerenderContent(m, true, true)
+		// 		if cmd != nil {
+		// 			cmds = append(cmds, cmd)
+		// 		}
+		// 	}
 		default:
-			if m.currentPath != "/posts" {
-				m.viewport, cmd = m.viewport.Update(msg)
-			} else {
-				m.posts, cmd = m.posts.Update(msg)
-			}
+			m.viewport, cmd = m.viewport.Update(msg)
+			// m.posts, cmd = m.posts.Update(msg)
+			// if m.currentPath != "/posts" {
+			// 	m.viewport, cmd = m.viewport.Update(msg)
+			// } else {
+			// 	m.posts, cmd = m.posts.Update(msg)
+			// }
 		}
 	}
 
@@ -400,9 +402,9 @@ func HeaderView(m model) string {
 
 	// build out text
 	content := m.currentPath
-	sideContent := fmt.Sprintf("%s %s", ApplyHighlight("p"), ApplySubtle("posts"))
+	// sideContent := fmt.Sprintf("%s %s", ApplyHighlight("p"), ApplySubtle("posts"))
 	if content != "/root" {
-		sideContent = fmt.Sprintf("%s %s", ApplyHighlight("b"), ApplySubtle("back"))
+		// sideContent = fmt.Sprintf("%s %s", ApplyHighlight("b"), ApplySubtle("back"))
 	} else {
 		content = "/"
 	}
@@ -419,11 +421,12 @@ func HeaderView(m model) string {
 
 	var (
 		pathStyle = lipgloss.NewStyle().Width(mainContentWidth).Padding(0, linkPadding).Render
-		altStyle  = lipgloss.NewStyle().Width(altLinkWidth).Padding(0, linkPadding).Render
+		// altStyle  = lipgloss.NewStyle().Width(altLinkWidth).Padding(0, linkPadding).Render
 	)
 
 	t := table.New().BorderColumn(true).Width(m.fitWidth).Border(lipgloss.NormalBorder()).BorderStyle(lipgloss.NewStyle().Foreground(tableBorderColor))
-	t.Row(pathStyle(content), altStyle(sideContent))
+	// t.Row(pathStyle(content), altStyle(sideContent))
+	t.Row(pathStyle(content))
 
 	return lipgloss.NewStyle().Width(m.cmdWidth).Height(headerHeight).Align(lipgloss.Center, lipgloss.Top).SetString(t.Render()).Render()
 }

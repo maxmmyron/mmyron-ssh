@@ -2,7 +2,7 @@
   "document": {
     "block_prefix": "\n",
     "block_suffix": "\n",
-    "color": "#f8f8f2"
+    "color": "#A1A1AA"
   },
   "block_quote": {
     "color": "#f1fa8c",
@@ -12,47 +12,50 @@
   },
   "paragraph": {},
   "list": {
-    "color": "#f8f8f2",
+    "color": "#A1A1AA",
     "level_indent": 2
   },
   "heading": {
     "block_suffix": "\n",
-    "color": "#bd93f9",
+    "color": "#B532B8",
     "bold": true
   },
   "h1": {
-    "prefix": "# ",
-    "background_color": "#282a36"
+    "prefix": "# "
   },
   "h2": {
-    "prefix": "## "
+    "prefix": "\n## "
   },
   "h3": {
-    "prefix": "### "
+    "prefix": "### ",
+    "bold": false
   },
   "h4": {
-    "prefix": "#### "
+    "prefix": "#### ",
+    "bold": false
   },
   "h5": {
-    "prefix": "##### "
+    "prefix": "##### ",
+    "bold": false
   },
   "h6": {
-    "prefix": "###### "
+    "prefix": "###### ",
+    "bold": false
   },
   "text": {},
   "strikethrough": {
     "crossed_out": true
   },
   "emph": {
-    "color": "#f1fa8c",
+    "color": "#DFB4D9",
     "italic": true
   },
   "strong": {
-    "color": "#ffb86c",
+    "color": "#DFB4D9",
     "bold": true
   },
   "hr": {
-    "color": "#6272A4",
+    "color": "#3F3F46",
     "format": "\n--------\n"
   },
   "item": {
@@ -60,39 +63,44 @@
   },
   "enumeration": {
     "block_prefix": ". ",
-    "color": "#8be9fd"
+    "color": "#827580"
   },
   "task": {
     "ticked": "[✓] ",
     "unticked": "[ ] "
   },
   "link": {
-    "color": "#8be9fd",
-    "underline": true
+    "color": "#F88CFA",
+    "underline": true,
+    "prefix": "(",
+    "suffix": ")"
   },
   "link_text": {
-    "color": "#ff79c6"
+    "color": "#F88CFA"
   },
   "image": {
     "color": "#8be9fd",
     "underline": true
   },
   "image_text": {
-    "color": "#ff79c6",
+    "color": "#F88CFA",
     "format": "Image: {{.text}} →"
   },
   "code": {
-    "color": "#50fa7b"
+    "color": "#A1A1AA",
+    "background_color": "#19191A",
+    "prefix": " ",
+    "suffix": " "
   },
   "code_block": {
     "color": "#ffb86c",
     "margin": 2,
     "chroma": {
       "text": {
-        "color": "#f8f8f2"
+        "color": "#A1A1AA"
       },
       "error": {
-        "color": "#f8f8f2",
+        "color": "#A1A1AA",
         "background_color": "#ff5555"
       },
       "comment": {
@@ -117,7 +125,7 @@
         "color": "#ff79c6"
       },
       "punctuation": {
-        "color": "#f8f8f2"
+        "color": "#A1A1AA"
       },
       "name": {
         "color": "#8be9fd"
