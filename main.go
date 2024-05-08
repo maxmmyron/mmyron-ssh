@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -27,11 +26,9 @@ import (
 )
 
 type model struct {
-	loaded      bool           // whether or not the viewport is loaded
-	viewport    viewport.Model // mostly holds glamour output
-	currentPath string         // current path we're rendering
-	fitWidth    int            // best fit content width max 80ch
-	posts       list.Model
+	loaded   bool           // whether or not the viewport is loaded
+	viewport viewport.Model // mostly holds glamour output
+	fitWidth int            // best fit content width max 80ch
 	// terminal dims:
 	cmdWidth  int
 	cmdHeight int
@@ -70,15 +67,12 @@ Clippy.mov is a web-based video editor built using FFmpeg.wasm. I stopped develo
 
 	bot = `## Want to get in touch?
 
-Thanks :D
-
-Feel free to shoot me an email at [max@mmyron.com](mailto:max@mmyron.com).
+Thanks, that's awesome! :D
 `
 )
 
 var (
 	glamourRenderer  *glamour.TermRenderer // current renderer
-	posts            []list.Item
 	ApplyNormal      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#27272A", Dark: "#A1A1AA"}).Render
 	ApplySubtle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#52525B", Dark: "#71717A"}).Render
 	ApplyMuted       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#D4D4D8", Dark: "#3F3F46"}).Render
@@ -154,16 +148,10 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	vp.HighPerformanceRendering = useHighPerformanceRenderer
 
 	m := model{
-		viewport:    vp,
-		fitWidth:    computedWidth,
-		loaded:      false,
-		currentPath: "/root",
+		viewport: vp,
+		fitWidth: computedWidth,
+		loaded:   false,
 	}
-
-	// reset posts
-	posts = []list.Item{}
-
-	m.posts = list.New(posts, list.NewDefaultDelegate(), computedWidth, physHeight-headerHeight-footerHeight)
 
 	// FIXME: dont use tea.WithMouseCellMotion() because it seems to break the viewport when scrolling fast
 	return m, []tea.ProgramOption{tea.WithMouseCellMotion(), tea.WithAltScreen()}
@@ -185,7 +173,6 @@ func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.
 	m.viewport.Height = m.cmdHeight - headerHeight - footerHeight
 
 	if needsNewTerm {
-
 		// set up a new renderer
 		renderer, err := glamour.NewTermRenderer(
 			glamour.WithEnvironmentConfig(),
@@ -247,7 +234,14 @@ func RerenderContent(m model, needsNewFile bool, needsNewTerm bool) (model, tea.
 	topRender, _ := glamourRenderer.Render(top)
 	botRender, _ := glamourRenderer.Render(bot)
 
-	cmb := lipgloss.JoinVertical(lipgloss.Top, topRender, flex, botRender)
+	topRender = strings.TrimPrefix(topRender, "\n")
+	botRender = strings.TrimSuffix(botRender, "\n")
+
+	contactA := lipgloss.Place(8, 1, lipgloss.Left, lipgloss.Center, ApplySubtle("email")) + ApplyMuted("•") + " " + ApplyNormal("max@mmyron.com") + "\n"
+	contactB := lipgloss.Place(8, 1, lipgloss.Left, lipgloss.Center, ApplySubtle("twitter")) + ApplyMuted("•") + " " + ApplyNormal("@mmorenthal") + "\n"
+	contactC := lipgloss.Place(8, 1, lipgloss.Left, lipgloss.Center, ApplySubtle("github")) + ApplyMuted("•") + " " + ApplyNormal("maxmmyron") + "\n"
+
+	cmb := lipgloss.JoinVertical(lipgloss.Top, topRender, flex, botRender, contactA, contactB, contactC)
 
 	// in high perf mode, View() doesn't seem to render content in *quite* the same way. here, we do some prelim.
 	// rendering by placing the rendered post in a container, and setting the viewport's content to that container
@@ -282,10 +276,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fitWidth = m.fitWidth - 4
 		}
 
-		// if we're not on the posts page, then update the viewport height
-		if m.currentPath != "/posts" {
-			m.viewport.Height = msg.Height - headerHeight - footerHeight
-		}
+		// update the viewport height
+		m.viewport.Height = msg.Height - headerHeight - footerHeight
 
 		m.cmdWidth = msg.Width
 		m.cmdHeight = msg.Height
@@ -345,12 +337,6 @@ func (m model) View() string {
 	// this View() fn because we're in high perf. render mode)
 	var inner = strings.Repeat("\n", max(0, m.viewport.Height-1))
 
-	// if we're on the posts page, render that as our "inner" content
-	if m.currentPath == "/posts" {
-		listContainer := lipgloss.NewStyle().Width(m.fitWidth).Height(m.posts.Height()).Align(lipgloss.Left, lipgloss.Top).SetString(m.posts.View()).Render()
-		inner = lipgloss.Place(m.cmdWidth, m.posts.Height(), lipgloss.Center, lipgloss.Top, listContainer)
-	}
-
 	combinedVp := lipgloss.JoinVertical(lipgloss.Top, header, inner, footer)
 
 	return lipgloss.NewStyle().Width(m.cmdWidth).Height(m.cmdHeight).Align(lipgloss.Center, lipgloss.Top).Render(combinedVp)
@@ -362,13 +348,7 @@ func HeaderView(m model) string {
 		linkPadding  = 2
 	)
 
-	// build out text
-	content := m.currentPath
-	if content != "/root" {
-	} else {
-		content = "/"
-	}
-	content = ApplyNormal("mmyron.com" + content)
+	content := ApplyNormal("mmyron.com/")
 
 	// calculate widths for main content
 	mainWidth := m.fitWidth - altLinkWidth
