@@ -263,9 +263,10 @@ func (m model) Init() tea.Cmd {
 var lastFitWidth = 0
 var lastHeight = 0
 
-var dirty = false      // whether or not to page centering
-var superDirty = false // whether or not we need a full rerender
-var ultraDirty = false // whether or not we should reset viewport scroll
+var dirty = false        // whether or not to page centering
+var superDirty = false   // whether or not we need a full rerender
+var ultraDirty = false   // whether or not we should reset viewport scroll
+var isVertLayout = false // whether or not the current render mode is vertical
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
@@ -278,6 +279,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fitWidth = min(msg.Width, maxWidth)
 		if m.fitWidth < 80 {
 			m.fitWidth = m.fitWidth - 4
+			if !isVertLayout {
+				ultraDirty = true
+			}
+			isVertLayout = true
+		} else {
+			if isVertLayout {
+				ultraDirty = true
+			}
+			isVertLayout = false
 		}
 
 		// update the viewport height
@@ -332,6 +342,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = RerenderContent(m, false, false)
 		}
 		dirty = false
+
+		if ultraDirty {
+			m.viewport.GotoTop()
+			ultraDirty = false
+		}
+
 		cmds = append(cmds, cmd)
 	}
 
