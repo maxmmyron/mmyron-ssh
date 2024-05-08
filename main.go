@@ -261,6 +261,11 @@ func (m model) Init() tea.Cmd {
 }
 
 var lastFitWidth = 0
+var lastHeight = 0
+
+var dirty = false      // whether or not to page centering
+var superDirty = false // whether or not we need a full rerender
+var ultraDirty = false // whether or not we should reset viewport scroll
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
@@ -270,7 +275,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		lastFitWidth = m.fitWidth
 		m.fitWidth = min(msg.Width, maxWidth)
 		if m.fitWidth < 80 {
 			m.fitWidth = m.fitWidth - 4
@@ -290,21 +294,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
-		// request rerender if best fit width has changed
+		if m.viewport.PastBottom() {
+			m.viewport.GotoBottom()
+		}
+
+		dirty = true
 		if lastFitWidth != m.fitWidth {
-			m, cmd = RerenderContent(m, false, true)
-			cmds = append(cmds, cmd)
-		} else {
-			m, cmd = RerenderContent(m, false, false)
-			cmds = append(cmds, cmd)
+			superDirty = true
 		}
 
 		// resync on resize if using high performance renderer
 		if useHighPerformanceRenderer {
 			// we have to manually offset the viewport so the header renders correctly
-			m.viewport.YPosition = headerHeight + 1
+			m.viewport.YPosition = headerHeight
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
+
+		lastFitWidth = m.fitWidth
+		lastHeight = m.cmdHeight
 
 		return m, tea.Batch(cmds...)
 
@@ -315,6 +322,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.viewport, cmd = m.viewport.Update(msg)
 		}
+	}
+
+	if dirty {
+		if superDirty {
+			m, cmd = RerenderContent(m, false, true)
+			superDirty = false
+		} else {
+			m, cmd = RerenderContent(m, false, false)
+		}
+		dirty = false
+		cmds = append(cmds, cmd)
 	}
 
 	if cmd != nil {
